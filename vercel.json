@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "installCommand": "yarn install --frozen-lockfile",
-  "buildCommand": "yarn workspace @project/pulse-chat build",
+  "installCommand": "npm ci",
+  "buildCommand": "npm run build --workspace=@project/pulse-chat",
   "outputDirectory": "apps/pulse-chat/dist"
 }
