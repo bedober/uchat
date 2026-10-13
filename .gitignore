@@ -1,6 +1,11 @@
-node_modules
-dist
+node_modules/
+dist/
+build/
+.env
+.env.*
+!.env.example
 .env.local
-.tsbuildinfo
+*.tsbuildinfo
+.DS_Store
 __zite__*
 .npmrc
