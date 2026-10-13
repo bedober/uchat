@@ -20,8 +20,19 @@ import CreatorStudioPage from './pages/CreatorStudioPage';
 
 function Splash() {
   return (
-    <div className="flex h-full items-center justify-center">
-      <Loader2 className="h-6 w-6 animate-spin text-primary" />
+    <div className="flex min-h-full flex-col items-center justify-center gap-5 bg-background px-6 py-10 text-foreground">
+      <div className="grid h-14 w-14 place-items-center rounded-2xl bg-primary text-xl font-black tracking-tight text-primary-foreground shadow-sm">
+        U
+      </div>
+      <div className="text-center">
+        <p className="text-2xl font-extrabold tracking-tight">UChat</p>
+        <p className="mt-1 text-sm text-muted-foreground">Your conversations, all together.</p>
+      </div>
+      <Loader2 className="h-5 w-5 animate-spin text-primary" aria-label="Loading UChat" />
+      <span className="uchat-security-status">
+        <span className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden="true" />
+        SECURITY ACTIVE
+      </span>
     </div>
   );
 }
