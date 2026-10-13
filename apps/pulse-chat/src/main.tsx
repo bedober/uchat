@@ -20,25 +20,25 @@ function RuntimeErrorFallback(props: { error: Error }) {
   const allowAiFix = window.__ziteAllowAiFix === true;
 
   return (
-    <div className="fixed inset-0 grid place-items-center">
-      <div className="relative w-full max-w-xl rounded border-t-4 border-t-red-500 bg-white p-4 shadow-lg">
-        <h3 className="mb-2 flex items-center gap-2 font-medium">
+    <div className="fixed inset-0 grid place-items-center bg-background p-4 text-foreground">
+      <div className="relative w-full max-w-xl rounded-2xl border border-border bg-card p-6 text-card-foreground shadow-xl">
+        <h3 className="mb-2 flex items-center gap-2 text-lg font-bold tracking-tight">
           Issue rendering app
         </h3>
-        <p className="mb-4 text-sm text-gray-600">
+        <p className="mb-4 text-sm leading-6 text-muted-foreground">
           {allowAiFix
             ? 'Try asking Zite to fix the issue or find a workaround.'
             : 'Something went wrong while loading this app. You can try reloading the page.'}
         </p>
 
-        <pre className="overflow-auto rounded border-l-4 border-red-500 bg-red-50 p-4 font-mono text-sm text-red-900">
+        <pre className="overflow-auto rounded-xl border border-destructive/20 bg-destructive/5 p-4 font-mono text-xs leading-5 text-destructive">
           {props.error.message}
         </pre>
         <div className="mt-4 flex gap-2">
           {allowAiFix ? (
             <button
               type="button"
-              className="flex items-center gap-2 rounded border border-red-100 bg-red-50 px-2.5 py-1.5 text-sm font-medium text-red-500 transition hover:bg-red-100"
+              className="flex items-center gap-2 rounded-xl border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm font-semibold text-destructive transition-colors hover:bg-destructive/10"
               onClick={() => window._ziteOnFixError?.(props.error)}
             >
               <HammerIcon className="h-4 w-4" />
@@ -48,7 +48,7 @@ function RuntimeErrorFallback(props: { error: Error }) {
           <button
             type="button"
             onClick={reloadApp}
-            className="flex items-center gap-2 rounded border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-sm font-medium text-gray-500 transition hover:bg-gray-100"
+            className="flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-muted"
           >
             Reload
           </button>
