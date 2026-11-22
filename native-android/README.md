@@ -67,7 +67,7 @@ References:
 
 - Use **Back up** and **Restore** in the Android app and select a destination/source through Android's Storage Access Framework. Any installed document provider may appear, including Google Drive, OneDrive, Dropbox, or other compatible cloud/storage apps.
 - Backup contents are serialized on-device and encrypted before the selected provider receives any bytes. The provider stores an opaque `.uchb` file; UChat does not upload the password or encryption key.
-- Container format: versioned header, 16-byte random salt, 12-byte random nonce, and AES-256-GCM authenticated ciphertext. Key derivation is PBKDF2-HMAC-SHA256 with 600,000 iterations. A password of at least 12 characters is required.
+- Container format: versioned header, 16-byte random salt, 12-byte random nonce, and AES-256-GCM authenticated ciphertext. Key derivation is Argon2id v1.3 with 64 MiB memory, 3 iterations and 1 lane. A password of at least 12 characters is required.
 - On restore, AES-GCM authentication is verified before parsing. Restored values are re-encrypted under the receiving phone's own non-exportable Android Keystore key.
 - The password is not saved. If it is lost, the cloud file cannot be decrypted. Store it separately in a trusted password manager or offline recovery location.
 - The current portable backup includes the prototype conversation key and up to 500 saved transcript entries. It does not yet include attachments, contacts, account credentials, wallet private keys, transaction history, or full app state.
@@ -75,6 +75,6 @@ References:
 
 ### Cryptographic scope and remaining work
 
-AES-256-GCM with authenticated metadata and a high-iteration PBKDF2-HMAC-SHA256 password KDF is a conservative interoperable Android/JCA baseline, not a claim of the strongest possible password-hardening. A future hardened format should migrate to a vetted Argon2id implementation with calibrated memory/time cost, versioned KDF parameters, and migration tests. Password entropy matters more than raw AES key size. Never reuse a backup password across unrelated services.
+AES-256-GCM with authenticated metadata and Argon2id (64 MiB, 3 iterations, 1 lane) provides strong password-based key derivation for this mobile backup format. These parameters are a starting point and should be benchmarked on low-memory Android devices and reviewed before production release. Password entropy matters more than raw AES key size. Never reuse a backup password across unrelated services.
 
 The backup protects data in the cloud and in transit to/from the selected provider, but does not protect data while the phone is unlocked or compromised. Android Keystore device-local encryption keys are intentionally not exported; portable backups decrypt and re-encrypt data across devices using the user-held backup password.
