@@ -11,8 +11,30 @@ async function redis(...args) {
   const result=await response.json(); if(result[0]?.error) throw new Error("Redis operation failed"); return result[0]?.result;
 }
 async function sendEmail(to, code) {
-  const response=await fetch("https://api.resend.com/emails",{method:"POST",headers:{"authorization":"Bearer "+env("RESEND_API_KEY"),"content-type":"application/json"},body:JSON.stringify({from:env("UCHAT_EMAIL_FROM"),to:[to],subject:"Your UChat verification code",text:"Your UChat verification code is "+code+". It expires in 10 minutes. If you did not request this, ignore this email."})});
-  if(!response.ok) throw new Error("Email delivery failed");
+  const user=env("GOOGLE_SMTP_USER");
+  const pass=env("GOOGLE_SMTP_APP_PASSWORD");
+  const { default: nodemailer }=await import("nodemailer");
+  const transporter=nodemailer.createTransport({
+    host:"smtp.gmail.com",
+    port:465,
+    secure:true,
+    auth:{user,pass},
+    connectionTimeout:10000,
+    greetingTimeout:10000,
+    socketTimeout:15000
+  });
+  try {
+    await transporter.sendMail({
+      from: user,
+      to,
+      subject:"Your UChat verification code",
+      text:"Your UChat verification code is "+code+". It expires in 10 minutes. If you did not request this, ignore this email.",
+      disableFileAccess:true,
+      disableUrlAccess:true
+    });
+  } finally {
+    transporter.close();
+  }
 }
 async function sendSms(to, code) {
   const sid=env("TWILIO_ACCOUNT_SID"), token=env("TWILIO_AUTH_TOKEN"), from=env("TWILIO_FROM_NUMBER");
