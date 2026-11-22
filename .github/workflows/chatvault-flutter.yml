@@ -2,7 +2,7 @@ name: ChatVault Flutter CI
 
 on:
   push:
-    branches: [main, "feature/chatvault-flutter-foundation"]
+    branches: [main, "feature/chatvault-flutter"]
     paths:
       - "chatvault/**"
       - ".github/workflows/chatvault-flutter.yml"
@@ -25,6 +25,9 @@ jobs:
           channel: stable
           cache: true
       - run: flutter --version
+      # The repository stores a platform-neutral Flutter source tree. Generate
+      # the native Android/iOS runners before resolving plugins or building.
+      - run: flutter create --platforms=android,ios --project-name chatvault .
       - run: flutter pub get
       - run: flutter analyze --no-fatal-infos
       - run: flutter test
