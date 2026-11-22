@@ -1,4 +1,4 @@
-package so.zite.uchat.mesh.transport
+package com.uchat.mesh.transport
 import android.content.Context
 import android.net.wifi.p2p.WifiP2pManager
 import android.os.Looper
