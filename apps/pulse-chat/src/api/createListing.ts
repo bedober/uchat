@@ -4,13 +4,13 @@ import { zite } from 'zitejs/db';
 import { requireActiveUser } from '../lib/server';
 
 export default createEndpoint({
-  description: 'Create a community marketplace listing',
+  description: 'Create a community marketplace listing, including hardware wallet devices',
   authenticated: true,
   inputSchema: z.object({
     title: z.string(),
     description: z.string(),
     priceUgx: z.number().nonnegative(),
-    category: z.enum(['Product', 'Service', 'Job opportunity']),
+    category: z.enum(['Product', 'Hardware wallet', 'Service', 'Job opportunity']),
     contact: z.string(),
     photoUrl: z.string().url().optional(),
     photoName: z.string().max(200).optional(),
@@ -24,6 +24,9 @@ export default createEndpoint({
     if (title.length < 3 || title.length > 90) throw new Error('Title must be 3–90 characters');
     if (description.length < 5 || description.length > 1500) throw new Error('Description must be 5–1,500 characters');
     if (!contact || contact.length > 100) throw new Error('Enter a contact number or contact handle');
+    if (input.category === 'Hardware wallet' && /seed phrase|recovery phrase|private key/i.test(description)) {
+      throw new Error('Do not include recovery phrases or private keys in a listing');
+    }
     const record = await zite.marketplaceListings.create({
       record: {
         title,
