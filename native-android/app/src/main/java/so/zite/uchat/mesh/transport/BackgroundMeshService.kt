@@ -1,4 +1,4 @@
-package so.zite.uchat.mesh.transport
+package com.uchat.mesh.transport
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -9,10 +9,10 @@ import android.content.Intent
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
-import so.zite.uchat.mesh.MainActivity
-import so.zite.uchat.mesh.R
-import so.zite.uchat.mesh.security.SecureLocalStore
-import so.zite.uchat.mesh.security.SharedKeyCipher
+import com.uchat.mesh.MainActivity
+import com.uchat.mesh.R
+import com.uchat.mesh.security.SecureLocalStore
+import com.uchat.mesh.security.SharedKeyCipher
 import com.google.android.gms.nearby.Nearby
 import com.google.android.gms.nearby.connection.*
 
@@ -28,8 +28,8 @@ import com.google.android.gms.nearby.connection.*
  */
 class BackgroundMeshService : Service() {
     companion object {
-        const val ACTION_START = "so.zite.uchat.mesh.action.START_BACKGROUND"
-        const val ACTION_STOP = "so.zite.uchat.mesh.action.STOP_BACKGROUND"
+        const val ACTION_START = "com.uchat.mesh.action.START_BACKGROUND"
+        const val ACTION_STOP = "com.uchat.mesh.action.STOP_BACKGROUND"
         private const val CHANNEL_ID = "uchat_mesh_presence"
         private const val NOTIFICATION_ID = 4201
         private const val SERVICE_ID_SUFFIX = ".uchat-mesh"
