@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
+import { readEncryptedPreferences, writeEncryptedPreferences } from '../lib/encryptedLocalVault';
 import { useQuery } from '@tanstack/react-query';
-import { getSafety, updateSafety, getFollowData, manageFollow, getPushConfig, savePushSubscription, deletePushSubscription } from 'zitejs/api';
-import { Bell, Languages, Leaf, LockKeyhole, Save, ShieldCheck, SlidersHorizontal } from 'lucide-react';
+import { getFollowData, manageFollow, getPushConfig, savePushSubscription, deletePushSubscription } from 'zitejs/api';
+import { Bell, Languages, Leaf, LockKeyhole, Save, SlidersHorizontal } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@project/components/ui/button';
 import { Label } from '@project/components/ui/label';
@@ -13,7 +14,6 @@ type Preferences = {
   language: 'en' | 'lg' | 'sw' | 'ach' | 'fr';
   feedOrder: 'newest' | 'popular';
   quietNotifications: boolean;
-  profileVisibility: 'public' | 'private';
 };
 
 const defaults: Preferences = {
@@ -21,19 +21,8 @@ const defaults: Preferences = {
   language: 'en',
   feedOrder: 'newest',
   quietNotifications: false,
-  profileVisibility: 'public',
 };
 
-function loadLocal(): Partial<Preferences> {
-  try {
-    const raw = JSON.parse(localStorage.getItem('uchat-preferences') || '{}');
-    return {
-      lowData: localStorage.getItem('uchat-low-data') === 'true',
-      feedOrder: localStorage.getItem('uchat-feed-order') === 'popular' ? 'popular' : 'newest',
-      ...raw,
-    };
-  } catch { return defaults; }
-}
 
 function decodeVapidKey(value: string): ArrayBuffer {
   const padded = value + '='.repeat((4 - value.length % 4) % 4);
@@ -44,23 +33,22 @@ function decodeVapidKey(value: string): ArrayBuffer {
 }
 
 export default function SettingsPage() {
-  const [prefs, setPrefs] = useState<Preferences>({ ...defaults, ...loadLocal() });
+  const [prefs, setPrefs] = useState<Preferences>(defaults);
+  const [vaultReady, setVaultReady] = useState(false);
   const [saving, setSaving] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushSupported] = useState(() => typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window);
-  const safety = useQuery({ queryKey: ['safety'], queryFn: () => getSafety({}) });
   const followData = useQuery({ queryKey: ['follow-data'], queryFn: () => getFollowData({}) });
 
   useEffect(() => {
-    if (!safety.data) return;
-    setPrefs((old) => ({
-      ...old,
-      language: safety.data.preferredLanguage as Preferences['language'],
-      quietNotifications: safety.data.quietNotifications,
-      profileVisibility: safety.data.profileVisibility as Preferences['profileVisibility'],
-    }));
-  }, [safety.data]);
+    let active = true;
+    readEncryptedPreferences<Partial<Preferences>>()
+      .then((saved) => { if (active && saved) setPrefs({ ...defaults, ...saved }); })
+      .catch(() => { if (active) toast.error('Could not unlock encrypted settings on this device.'); })
+      .finally(() => { if (active) setVaultReady(true); });
+    return () => { active = false; };
+  }, []);
 
   const update = <K extends keyof Preferences>(key: K, value: Preferences[K]) => setPrefs((old) => ({ ...old, [key]: value }));
 
@@ -118,16 +106,12 @@ export default function SettingsPage() {
   const save = async () => {
     setSaving(true);
     try {
-      await updateSafety({
-        profileVisibility: prefs.profileVisibility,
-        quietNotifications: prefs.quietNotifications,
-        preferredLanguage: prefs.language,
-      });
-      localStorage.setItem('uchat-preferences', JSON.stringify(prefs));
-      localStorage.setItem('uchat-low-data', String(prefs.lowData));
-      localStorage.setItem('uchat-feed-order', prefs.feedOrder);
+      await writeEncryptedPreferences(prefs);
+      // Remove legacy plaintext preference copies after a successful encrypted save.
+      localStorage.removeItem('uchat-preferences');
+      localStorage.removeItem('uchat-low-data');
+      localStorage.removeItem('uchat-feed-order');
       window.dispatchEvent(new CustomEvent('uchat-preferences-changed'));
-      await safety.refetch();
       toast.success('Preferences saved');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Could not save preferences');
@@ -140,7 +124,7 @@ export default function SettingsPage() {
         <header>
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">Your experience</p>
           <h1 className="mt-1 text-2xl font-extrabold">Settings</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Control your feed, data use, language, and account visibility.</p>
+          <p className="mt-1 text-sm text-muted-foreground">Your feed and language preferences are encrypted and stored on this device.</p>
         </header>
 
         <section className="space-y-4 rounded-2xl border bg-card p-4">
@@ -195,8 +179,8 @@ export default function SettingsPage() {
           {!followData.data?.incoming.length ? <p className="text-sm text-muted-foreground">No pending requests.</p> : followData.data.incoming.map((request) => <div key={request.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-3"><div className="min-w-0"><p className="text-sm font-semibold">Follow request</p><p className="break-all text-xs text-muted-foreground">Account ID: {request.followerId}</p></div><div className="flex gap-2"><Button size="sm" onClick={() => handleFollowRequest(request.id, 'approve')}>Approve</Button><Button size="sm" variant="outline" onClick={() => handleFollowRequest(request.id, 'reject')}>Decline</Button></div></div>)}
         </section>
 
-        <Button onClick={save} disabled={saving || safety.isLoading} className="w-full sm:w-auto"><Save className="mr-2 h-4 w-4" />{saving ? 'Saving…' : 'Save preferences'}</Button>
-        <p className="flex items-center gap-2 text-xs text-muted-foreground"><LockKeyhole className="h-3.5 w-3.5" />Account safety settings sync to your account; feed and low-data settings are saved in this browser.</p>
+        <Button onClick={save} disabled={saving || !vaultReady} className="w-full sm:w-auto"><Save className="mr-2 h-4 w-4" />{saving ? 'Saving…' : 'Save preferences'}</Button>
+        <p className="flex items-center gap-2 text-xs text-muted-foreground"><LockKeyhole className="h-3.5 w-3.5" />Settings in this section are encrypted with AES-256-GCM and stored in this browser's IndexedDB. The browser and device still control access to this app.</p>
       </div>
     </div>
   );
