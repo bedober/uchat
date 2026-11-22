@@ -20,6 +20,7 @@ dependencies {
  implementation("androidx.compose.material:material-icons-extended")
  implementation("androidx.core:core-ktx:1.15.0")
  implementation("com.google.android.gms:play-services-nearby:19.3.0")
+ implementation("org.bouncycastle:bcprov-jdk18on:1.80")
  debugImplementation("androidx.compose.ui:ui-tooling")
  testImplementation("junit:junit:4.13.2")
 }
