@@ -9,7 +9,8 @@
     "typecheck": "zitejs check"
   },
   "dependencies": {
-    "zitejs": "0.9.135"
+    "zitejs": "0.9.135",
+    "nodemailer": "^7.0.10"
   },
   "devDependencies": {}
 }
