@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@project/components/ui
 import ResumeView from '../components/ResumeView';
 import ResumeEditor from '../components/ResumeEditor';
 import ResumeAssistant from '../components/ResumeAssistant';
+import SettingsPage from './SettingsPage';
 
 type Resume = NonNullable<GetMeOutputType['profile']>['resume'];
 
@@ -32,6 +33,7 @@ export default function ProfilePage() {
               <TabsTrigger value="resume">My resume</TabsTrigger>
               <TabsTrigger value="ai"><Sparkles className="mr-1 h-3.5 w-3.5" />AI assistant</TabsTrigger>
               <TabsTrigger value="edit">Edit profile</TabsTrigger>
+              <TabsTrigger value="settings">Settings</TabsTrigger>
             </TabsList>
             <TabsContent value="resume">
               <ResumeView name={profile.displayName} image={profile.avatarUrl} status={profile.status} resume={profile.resume}
@@ -53,6 +55,9 @@ export default function ProfilePage() {
               {aiDraft && <p className="mb-4 rounded-lg bg-accent px-3 py-2 text-sm">Draft from the AI assistant — check it over, then save.</p>}
               <ResumeEditor key={JSON.stringify(editing.resume)} profile={editing}
                 onSaved={() => { setAiDraft(null); setTab('resume'); }} />
+            </TabsContent>
+            <TabsContent value="settings" className="mt-0">
+              <SettingsPage />
             </TabsContent>
           </Tabs>
         )}
