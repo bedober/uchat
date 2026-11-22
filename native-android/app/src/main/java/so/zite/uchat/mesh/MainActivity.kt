@@ -19,69 +19,176 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import so.zite.uchat.mesh.security.MessageCipher
+import so.zite.uchat.mesh.security.SharedKeyCipher
 import so.zite.uchat.mesh.transport.RadioCapabilities
 import so.zite.uchat.mesh.transport.BleDiscovery
 import so.zite.uchat.mesh.transport.WifiDirectDiscovery
+import so.zite.uchat.mesh.transport.NearbyMeshTransport
 
 class MainActivity : ComponentActivity() {
- private val permissions = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { }
- override fun onCreate(savedInstanceState: Bundle?) {
-  super.onCreate(savedInstanceState)
-  val needed = buildList {
-   if (Build.VERSION.SDK_INT >= 31) add(Manifest.permission.BLUETOOTH_SCAN)
-   if (Build.VERSION.SDK_INT >= 31) add(Manifest.permission.BLUETOOTH_CONNECT)
-   if (Build.VERSION.SDK_INT >= 33) add(Manifest.permission.NEARBY_WIFI_DEVICES)
-   if (Build.VERSION.SDK_INT <= 32) add(Manifest.permission.ACCESS_FINE_LOCATION)
-  }.toTypedArray()
-  permissions.launch(needed)
-  setContent { MeshHome() }
- }
- @OptIn(ExperimentalMaterial3Api::class)
- @Composable private fun MeshHome() {
-  val caps = remember { RadioCapabilities.inspect(this) }
-  val cipher = remember { MessageCipher() }
-  val ble = remember { BleDiscovery(this) }
-  val wifi = remember { WifiDirectDiscovery(this) }
-  var status by remember { mutableStateOf("Ready to discover nearby UChat Mesh devices") }
-  var message by remember { mutableStateOf("") }
-  var localEcho by remember { mutableStateOf<List<String>>(emptyList()) }
-  MaterialTheme(colorScheme = darkColorScheme()) {
-   Scaffold(topBar = { TopAppBar(title = { Text("UChat Mesh") }, navigationIcon = { Icon(Icons.Default.Lock, null, Modifier.padding(start = 16.dp)) }) }) { padding ->
-    Column(Modifier.fillMaxSize().padding(padding).padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-     Text("Private messaging across available radios", style = MaterialTheme.typography.titleMedium)
-     Card { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-      Text("RADIO AVAILABILITY", style = MaterialTheme.typography.labelLarge)
-      Text("Bluetooth LE: " + if (caps.bluetoothLe) "Supported" else "Unavailable")
-      Text("Wi-Fi Direct: " + if (caps.wifiDirect) "Supported" else "Unavailable")
-      Text("Wi-Fi Aware: " + if (caps.wifiAware) "Supported" else "Unavailable")
-      Text("Wi-Fi enabled: " + caps.wifiEnabled)
-     } }
-     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-      Button(onClick = {
-       status = "Starting Bluetooth discovery…"
-       val started = ble.start { peer -> status = "Nearby BLE device: " + peer }
-       if (!started) status = "Bluetooth scan unavailable. Check permissions and device support."
-      }, modifier = Modifier.weight(1f)) {
-       Icon(Icons.Default.Radar, null); Spacer(Modifier.width(6.dp)); Text("Find devices")
-      }
-      OutlinedButton(onClick = { wifi.discover { _, text -> status = text } }, modifier = Modifier.weight(1f)) { Text("Wi-Fi Direct") }
-     }
-     Text(status, style = MaterialTheme.typography.bodySmall)
-     HorizontalDivider()
-     Text("Encrypted local test", style = MaterialTheme.typography.titleSmall)
-     OutlinedTextField(value = message, onValueChange = { message = it }, label = { Text("Write a message") }, modifier = Modifier.fillMaxWidth())
-     Button(onClick = {
-      if (message.isNotBlank()) {
-       val encrypted = cipher.encrypt(message.toByteArray())
-       val recovered = cipher.decrypt(encrypted).decodeToString()
-       localEcho = localEcho + "Local AES-256-GCM round-trip: " + recovered
-       message = ""
-      }
-     }, modifier = Modifier.align(Alignment.End)) { Icon(Icons.Default.Send, null); Text("Test encryption") }
-     LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) { items(localEcho) { Text(it) } }
-     Text("Prototype: radio discovery and local encryption are implemented. Peer-to-peer encrypted transport, ratcheting sessions and background relay are not production-ready.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+    private val permissions = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        val needed = buildList {
+            if (Build.VERSION.SDK_INT >= 31) {
+                add(Manifest.permission.BLUETOOTH_SCAN)
+                add(Manifest.permission.BLUETOOTH_CONNECT)
+            }
+            if (Build.VERSION.SDK_INT >= 33) add(Manifest.permission.NEARBY_WIFI_DEVICES)
+            if (Build.VERSION.SDK_INT <= 32) add(Manifest.permission.ACCESS_FINE_LOCATION)
+        }.toTypedArray()
+        permissions.launch(needed)
+        setContent { MeshHome() }
     }
-   }
-  }
- }
+
+    @OptIn(ExperimentalMaterial3Api::class)
+    @Composable
+    private fun MeshHome() {
+        val caps = remember { RadioCapabilities.inspect(this) }
+        val localCipher = remember { MessageCipher() }
+        val ble = remember { BleDiscovery(this) }
+        val wifi = remember { WifiDirectDiscovery(this) }
+        var status by remember { mutableStateOf("Ready. Enable Bluetooth and Wi-Fi to connect nearby.") }
+        var message by remember { mutableStateOf("") }
+        var keyHex by remember { mutableStateOf("") }
+        var localEcho by remember { mutableStateOf<List<String>>(emptyList()) }
+        var connectedEndpoint by remember { mutableStateOf<String?>(null) }
+        var pendingPeer by remember { mutableStateOf<Triple<String, String, String>?>(null) }
+        val peers = remember { mutableStateListOf<Pair<String, String>>() }
+        val transport = remember {
+            NearbyMeshTransport(this, object : NearbyMeshTransport.Listener {
+                override fun onStatus(messageText: String) { status = messageText }
+                override fun onPeerFound(endpointId: String, name: String) {
+                    if (peers.none { it.first == endpointId }) peers.add(endpointId to name)
+                }
+                override fun onPeerLost(endpointId: String) { peers.removeAll { it.first == endpointId } }
+                override fun onVerificationRequired(endpointId: String, name: String, authenticationDigits: String) {
+                    pendingPeer = Triple(endpointId, name, authenticationDigits)
+                }
+                override fun onConnected(endpointId: String) {
+                    connectedEndpoint = endpointId
+                    status = "Connected. Compare the displayed verification code before sending private messages."
+                }
+                override fun onDisconnected(endpointId: String) {
+                    if (connectedEndpoint == endpointId) connectedEndpoint = null
+                    status = "Peer disconnected"
+                }
+                override fun onBytesReceived(endpointId: String, bytes: ByteArray) {
+                    try {
+                        val text = SharedKeyCipher.decrypt(keyHex, bytes).decodeToString()
+                        localEcho = localEcho + "Peer: $text"
+                    } catch (_: Exception) {
+                        localEcho = localEcho + "Received an unreadable message. Check that both devices use the same key."
+                    }
+                }
+                override fun onFailure(messageText: String) { status = messageText }
+            })
+        }
+
+        DisposableEffect(Unit) {
+            onDispose { transport.stop(); ble.stop() }
+        }
+
+        MaterialTheme(colorScheme = darkColorScheme()) {
+            Scaffold(topBar = {
+                TopAppBar(title = { Text("UChat Mesh") }, navigationIcon = {
+                    Icon(Icons.Default.Lock, null, Modifier.padding(start = 16.dp))
+                })
+            }) { padding ->
+                Column(
+                    Modifier.fillMaxSize().padding(padding).padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text("Nearby encrypted messaging", style = MaterialTheme.typography.titleMedium)
+                    Card {
+                        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text("RADIO SUPPORT", style = MaterialTheme.typography.labelLarge)
+                            Text("Bluetooth LE: " + if (caps.bluetoothLe) "Supported" else "Unavailable")
+                            Text("Wi-Fi Direct: " + if (caps.wifiDirect) "Supported" else "Unavailable")
+                            Text("Wi-Fi Aware: " + if (caps.wifiAware) "Supported" else "Unavailable")
+                            Text("Wi-Fi enabled: " + caps.wifiEnabled)
+                        }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = {
+                            transport.advertise(Build.MODEL.ifBlank { "UChat device" })
+                        }, modifier = Modifier.weight(1f)) { Text("Become visible") }
+                        OutlinedButton(onClick = { transport.discover() }, modifier = Modifier.weight(1f)) {
+                            Icon(Icons.Default.Radar, null); Spacer(Modifier.width(4.dp)); Text("Find peers")
+                        }
+                    }
+                    Text(status, style = MaterialTheme.typography.bodySmall)
+                    if (peers.isNotEmpty()) {
+                        Text("NEARBY DEVICES", style = MaterialTheme.typography.labelLarge)
+                        peers.forEach { peer ->
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(peer.second, modifier = Modifier.weight(1f))
+                                TextButton(onClick = {
+                                    transport.requestConnection(Build.MODEL.ifBlank { "UChat device" }, peer.first)
+                                }) { Text("Connect") }
+                            }
+                        }
+                    }
+                    HorizontalDivider()
+                    Text("Shared conversation key", style = MaterialTheme.typography.titleSmall)
+                    OutlinedTextField(
+                        value = keyHex, onValueChange = { keyHex = it.filter { ch -> ch in "0123456789abcdefABCDEF" }.take(64) },
+                        label = { Text("Same 64-character hex key on both phones") },
+                        supportingText = { Text("Generate and exchange this key securely in person. Never send it in chat.") },
+                        modifier = Modifier.fillMaxWidth(), singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = message, onValueChange = { message = it },
+                        label = { Text("Message") }, modifier = Modifier.fillMaxWidth()
+                    )
+                    Button(
+                        enabled = connectedEndpoint != null && keyHex.length == 64 && message.isNotBlank(),
+                        onClick = {
+                            try {
+                                val encrypted = SharedKeyCipher.encrypt(keyHex, message.toByteArray())
+                                transport.sendEncrypted(connectedEndpoint!!, encrypted)
+                                localEcho = localEcho + "Me: $message"
+                                message = ""
+                            } catch (e: Exception) { status = e.localizedMessage ?: "Encryption/send failed" }
+                        },
+                        modifier = Modifier.align(Alignment.End)
+                    ) { Icon(Icons.Default.Send, null); Text("Send encrypted") }
+                    Text("LOCAL ENCRYPTION CHECK", style = MaterialTheme.typography.labelLarge)
+                    Button(onClick = {
+                        if (message.isNotBlank()) {
+                            val encrypted = localCipher.encrypt(message.toByteArray())
+                            val recovered = localCipher.decrypt(encrypted).decodeToString()
+                            localEcho = localEcho + "Local Keystore AES-256-GCM test: $recovered"
+                            message = ""
+                        }
+                    }) { Text("Test device encryption") }
+                    LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        items(localEcho) { Text(it, style = MaterialTheme.typography.bodyMedium) }
+                    }
+                    Text(
+                        "Prototype only: manual shared-key AES-GCM and Nearby transport are implemented. This is not a Signal/WhatsApp-equivalent protocol; use only for controlled testing.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+        }
+
+        pendingPeer?.let { pending ->
+            AlertDialog(
+                onDismissRequest = { transport.reject(pending.first); pendingPeer = null },
+                title = { Text("Verify nearby device") },
+                text = {
+                    Text("Device: ${pending.second}\n\nCompare this code with the other phone. Accept only if both screens show exactly the same digits:\n\n${pending.third}")
+                },
+                confirmButton = {
+                    TextButton(onClick = { transport.accept(pending.first); pendingPeer = null }) { Text("Codes match — accept") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { transport.reject(pending.first); pendingPeer = null }) { Text("Reject") }
+                }
+            )
+        }
+    }
 }
