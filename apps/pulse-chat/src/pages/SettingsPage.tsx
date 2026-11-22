@@ -167,17 +167,11 @@ export default function SettingsPage() {
         </section>
 
         <section className="space-y-3 rounded-2xl border bg-card p-4">
-          <div className="flex items-start gap-3"><div className="rounded-xl bg-primary/10 p-2 text-primary"><ShieldCheck className="h-5 w-5" /></div><div><h2 className="font-semibold">Profile visibility</h2><p className="text-sm text-muted-foreground">Private profiles should only be visible to approved connections. Public is the current default.</p></div></div>
-          <Select value={prefs.profileVisibility} onValueChange={(v: 'public' | 'private') => update('profileVisibility', v)}>
-            <SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="public">Public profile</SelectItem><SelectItem value="private">Private profile</SelectItem></SelectContent>
-          </Select>
-          <p className="text-xs text-muted-foreground">This preference is stored in your account. Enforcement across every public profile endpoint is still being completed.</p>
-        </section>
-
-        <section className="space-y-3 rounded-2xl border bg-card p-4">
           <div><h2 className="font-semibold">Follow requests</h2><p className="text-sm text-muted-foreground">Approve or decline people requesting access to your private profile.</p></div>
           {!followData.data?.incoming.length ? <p className="text-sm text-muted-foreground">No pending requests.</p> : followData.data.incoming.map((request) => <div key={request.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-3"><div className="min-w-0"><p className="text-sm font-semibold">Follow request</p><p className="break-all text-xs text-muted-foreground">Account ID: {request.followerId}</p></div><div className="flex gap-2"><Button size="sm" onClick={() => handleFollowRequest(request.id, 'approve')}>Approve</Button><Button size="sm" variant="outline" onClick={() => handleFollowRequest(request.id, 'reject')}>Decline</Button></div></div>)}
         </section>
+
+        <p className="rounded-xl border border-amber-300/60 bg-amber-50 p-3 text-xs leading-5 text-amber-950">Privacy scope: feed and language preferences are encrypted locally. Follow requests and optional browser push registration still use UChat services; account profiles and messages have not yet been migrated to device-only storage or end-to-end encryption.</p>
 
         <Button onClick={save} disabled={saving || !vaultReady} className="w-full sm:w-auto"><Save className="mr-2 h-4 w-4" />{saving ? 'Saving…' : 'Save preferences'}</Button>
         <p className="flex items-center gap-2 text-xs text-muted-foreground"><LockKeyhole className="h-3.5 w-3.5" />Settings in this section are encrypted with AES-256-GCM and stored in this browser's IndexedDB. The browser and device still control access to this app.</p>
