@@ -1,6 +1,6 @@
 # UChat Android
 
-Native Android client built with Kotlin and Jetpack Compose. The launcher opens the native UChat interface and does not redirect to the website.
+Standalone native Android client built with Kotlin and Jetpack Compose. It does not use Zite, Zite runtime packages, or a website WebView. The launcher opens the native UChat interface.
 
 ## Current navigation
 
