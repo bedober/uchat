@@ -21,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import so.zite.uchat.mesh.security.MessageCipher
 import so.zite.uchat.mesh.security.SharedKeyCipher
+import so.zite.uchat.mesh.security.SecureLocalStore
 import so.zite.uchat.mesh.transport.RadioCapabilities
 import so.zite.uchat.mesh.transport.BleDiscovery
 import so.zite.uchat.mesh.transport.WifiDirectDiscovery
@@ -49,10 +50,15 @@ class MainActivity : ComponentActivity() {
     private fun MeshHome() {
         val caps = remember { RadioCapabilities.inspect(this) }
         val localCipher = remember { MessageCipher() }
+        val secureStore = remember { SecureLocalStore(this) }
         var status by remember { mutableStateOf("Ready. Enable Bluetooth and Wi-Fi to connect nearby.") }
         var message by remember { mutableStateOf("") }
-        var keyHex by remember { mutableStateOf("") }
-        var localEcho by remember { mutableStateOf<List<String>>(emptyList()) }
+        var keyHex by remember { mutableStateOf(secureStore.loadConversationKey()) }
+        val localEcho = remember { mutableStateListOf<String>().apply { addAll(secureStore.loadMessages()) } }
+        fun recordMessage(entry: String) {
+            localEcho.add(entry)
+            secureStore.saveMessages(localEcho.toList())
+        }
         var connectedEndpoint by remember { mutableStateOf<String?>(null) }
         var pendingPeer by remember { mutableStateOf<Triple<String, String, String>?>(null) }
         val peers = remember { mutableStateListOf<Pair<String, String>>() }
@@ -77,9 +83,9 @@ class MainActivity : ComponentActivity() {
                 override fun onBytesReceived(endpointId: String, bytes: ByteArray) {
                     try {
                         val text = SharedKeyCipher.decrypt(keyHex, bytes).decodeToString()
-                        localEcho = localEcho + "Peer: $text"
+                        recordMessage("Peer: $text")
                     } catch (_: Exception) {
-                        localEcho = localEcho + "Received an unreadable message. Check that both devices use the same key."
+                        recordMessage("Received an unreadable message. Check that both devices use the same key.")
                     }
                 }
                 override fun onFailure(messageText: String) { status = messageText }
@@ -133,7 +139,10 @@ class MainActivity : ComponentActivity() {
                     HorizontalDivider()
                     Text("Shared conversation key", style = MaterialTheme.typography.titleSmall)
                     OutlinedTextField(
-                        value = keyHex, onValueChange = { keyHex = it.filter { ch -> ch in "0123456789abcdefABCDEF" }.take(64) },
+                        value = keyHex, onValueChange = {
+                            keyHex = it.filter { ch -> ch in "0123456789abcdefABCDEF" }.take(64)
+                            if (keyHex.length == 64 || keyHex.isEmpty()) secureStore.saveConversationKey(keyHex)
+                        },
                         label = { Text("Same 64-character hex key on both phones") },
                         supportingText = { Text("Generate once, then transfer the key securely in person. Never send it in chat.") },
                         modifier = Modifier.fillMaxWidth(), singleLine = true
@@ -141,6 +150,7 @@ class MainActivity : ComponentActivity() {
                     OutlinedButton(onClick = {
                         val bytes = ByteArray(32).also { SecureRandom().nextBytes(it) }
                         keyHex = bytes.joinToString("") { "%02x".format(it) }
+                        secureStore.saveConversationKey(keyHex)
                         status = "New 256-bit key generated on this phone. Enter this exact key on the other phone using a secure out-of-band method."
                     }) { Text("Generate new 256-bit key") }
                     OutlinedTextField(
@@ -153,18 +163,29 @@ class MainActivity : ComponentActivity() {
                             try {
                                 val encrypted = SharedKeyCipher.encrypt(keyHex, message.toByteArray())
                                 transport.sendEncrypted(connectedEndpoint!!, encrypted)
-                                localEcho = localEcho + "Me: $message"
+                                recordMessage("Me: $message")
                                 message = ""
                             } catch (e: Exception) { status = e.localizedMessage ?: "Encryption/send failed" }
                         },
                         modifier = Modifier.align(Alignment.End)
                     ) { Icon(Icons.Default.Send, null); Text("Send encrypted") }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextButton(onClick = {
+                            localEcho.clear()
+                            secureStore.saveMessages(emptyList())
+                        }) { Text("Clear history") }
+                        TextButton(onClick = {
+                            keyHex = ""
+                            secureStore.saveConversationKey("")
+                            status = "Saved conversation key cleared from this device"
+                        }) { Text("Forget key") }
+                    }
                     Text("LOCAL ENCRYPTION CHECK", style = MaterialTheme.typography.labelLarge)
                     Button(onClick = {
                         if (message.isNotBlank()) {
                             val encrypted = localCipher.encrypt(message.toByteArray())
                             val recovered = localCipher.decrypt(encrypted).decodeToString()
-                            localEcho = localEcho + "Local Keystore AES-256-GCM test: $recovered"
+                            recordMessage("Local Keystore AES-256-GCM test: $recovered")
                             message = ""
                         }
                     }) { Text("Test device encryption") }
