@@ -1,4 +1,4 @@
-package so.zite.uchat.mesh
+package com.uchat.mesh
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
