@@ -17,6 +17,8 @@ import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import so.zite.uchat.mesh.security.MessageCipher
@@ -103,18 +105,45 @@ class MainActivity : ComponentActivity() {
             onDispose { transport.stop() }
         }
 
-        MaterialTheme(colorScheme = darkColorScheme()) {
-            Scaffold(topBar = {
-                TopAppBar(title = { Text("UChat Mesh") }, navigationIcon = {
-                    Icon(Icons.Default.Lock, null, Modifier.padding(start = 16.dp))
-                })
-            }) { padding ->
+        val uchatColors = lightColorScheme(
+            primary = Color(0xFFEC533C),
+            onPrimary = Color(0xFFFFFFFF),
+            secondary = Color(0xFF25252D),
+            onSecondary = Color(0xFFFAFAFA),
+            background = Color(0xFFFCFAF8),
+            onBackground = Color(0xFF16161D),
+            surface = Color(0xFFFFFFFF),
+            onSurface = Color(0xFF16161D),
+            surfaceVariant = Color(0xFFF3EFEC),
+            outline = Color(0xFFE5E0DC)
+        )
+        MaterialTheme(colorScheme = uchatColors) {
+            Scaffold(
+                containerColor = uchatColors.background,
+                topBar = {
+                    TopAppBar(
+                        title = {
+                            Column {
+                                Text("UChat", style = MaterialTheme.typography.titleLarge)
+                                Text("Private nearby messaging", style = MaterialTheme.typography.labelSmall, color = uchatColors.secondary)
+                            }
+                        },
+                        navigationIcon = {
+                            Icon(Icons.Default.Lock, null, Modifier.padding(start = 16.dp), tint = uchatColors.primary)
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFFFCFAF8))
+                    )
+                }
+            ) { padding ->
                 Column(
                     Modifier.fillMaxSize().padding(padding).padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text("Nearby encrypted messaging", style = MaterialTheme.typography.titleMedium)
-                    Card {
+                    Text("Your conversations, your privacy", style = MaterialTheme.typography.titleMedium, color = uchatColors.onBackground)
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
                         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text("RADIO SUPPORT", style = MaterialTheme.typography.labelLarge)
                             Text("Bluetooth LE: " + if (caps.bluetoothLe) "Supported" else "Unavailable")
@@ -156,7 +185,8 @@ class MainActivity : ComponentActivity() {
                         },
                         label = { Text("Same 64-character hex key on both phones") },
                         supportingText = { Text("Generate once, then transfer the key securely in person. Never send it in chat.") },
-                        modifier = Modifier.fillMaxWidth(), singleLine = true
+                        modifier = Modifier.fillMaxWidth(), singleLine = true,
+                        shape = RoundedCornerShape(14.dp)
                     )
                     OutlinedButton(onClick = {
                         val bytes = ByteArray(32).also { SecureRandom().nextBytes(it) }
@@ -166,7 +196,8 @@ class MainActivity : ComponentActivity() {
                     }) { Text("Generate new 256-bit key") }
                     OutlinedTextField(
                         value = message, onValueChange = { message = it },
-                        label = { Text("Message") }, modifier = Modifier.fillMaxWidth()
+                        label = { Text("Message") }, modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp)
                     )
                     Button(
                         enabled = connectedEndpoint != null && keyHex.length == 64 && message.isNotBlank(),
@@ -179,7 +210,7 @@ class MainActivity : ComponentActivity() {
                             } catch (e: Exception) { status = e.localizedMessage ?: "Encryption/send failed" }
                         },
                         modifier = Modifier.align(Alignment.End)
-                    ) { Icon(Icons.Default.Send, null); Text("Send encrypted") }
+                    , shape = RoundedCornerShape(12.dp)) { Icon(Icons.Default.Send, null); Text("Send encrypted") }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         TextButton(onClick = {
                             localEcho.clear()
