@@ -1,4 +1,4 @@
-package so.zite.uchat.mesh.security
+package com.uchat.mesh.security
 
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertThrows
