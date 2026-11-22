@@ -35,14 +35,10 @@ object BackupCrypto {
         val nonce = ByteArray(NONCE_BYTES).also(random::nextBytes)
         val header = magic + byteArrayOf(VERSION) + salt + nonce
         val key = derive(password, salt)
-        return try {
-            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-            cipher.init(Cipher.ENCRYPT_MODE, key, GCMParameterSpec(TAG_BITS, nonce))
-            cipher.updateAAD(header)
-            header + cipher.doFinal(plaintext)
-        } finally {
-            key.fill(0)
-        }
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.ENCRYPT_MODE, key, GCMParameterSpec(TAG_BITS, nonce))
+        cipher.updateAAD(header)
+        return header + cipher.doFinal(plaintext)
     }
 
     fun decrypt(container: ByteArray, password: CharArray): ByteArray {
@@ -65,8 +61,6 @@ object BackupCrypto {
             cipher.doFinal(container.copyOfRange(headerSize, container.size))
         } catch (e: Exception) {
             throw SecurityException("Backup authentication failed. Check your password or file integrity.", e)
-        } finally {
-            key.fill(0)
         }
     }
 
