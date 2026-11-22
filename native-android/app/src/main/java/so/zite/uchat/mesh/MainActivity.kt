@@ -8,6 +8,7 @@ import java.security.SecureRandom
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -23,6 +24,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import so.zite.uchat.mesh.security.MessageCipher
+import so.zite.uchat.mesh.security.BackupCrypto
 import so.zite.uchat.mesh.security.SharedKeyCipher
 import so.zite.uchat.mesh.security.SecureLocalStore
 import so.zite.uchat.mesh.transport.RadioCapabilities
@@ -63,11 +65,65 @@ class MainActivity : ComponentActivity() {
         val secureStore = remember { SecureLocalStore(this) }
         var status by remember { mutableStateOf("Ready. Enable Bluetooth and Wi-Fi to connect nearby.") }
         var message by remember { mutableStateOf("") }
+        var backupPassword by remember { mutableStateOf("") }
         var keyHex by remember { mutableStateOf(secureStore.loadConversationKey()) }
         val localEcho = remember { mutableStateListOf<String>().apply { addAll(secureStore.loadMessages()) } }
         fun recordMessage(entry: String) {
             localEcho.add(entry)
             secureStore.saveMessages(localEcho.toList())
+        }
+
+        val backupExportLauncher = rememberLauncherForActivityResult(
+            ActivityResultContracts.CreateDocument("application/octet-stream")
+        ) { uri ->
+            if (uri != null) {
+                val password = backupPassword.toCharArray()
+                Thread {
+                    try {
+                        require(password.size >= 12) { "Use at least 12 characters for the backup password." }
+                        val encrypted = BackupCrypto.encrypt(secureStore.exportPortableBackup(), password)
+                        contentResolver.openOutputStream(uri)?.use { it.write(encrypted) }
+                            ?: error("Could not open the selected cloud destination.")
+                        runOnUiThread { status = "Encrypted backup saved. Keep your password safe; UChat cannot recover it." }
+                    } catch (e: Exception) {
+                        runOnUiThread { status = e.localizedMessage ?: "Backup failed." }
+                    } finally { password.fill(' ') }
+                }.start()
+            }
+        }
+        val backupRestoreLauncher = rememberLauncherForActivityResult(
+            ActivityResultContracts.OpenDocument()
+        ) { uri ->
+            if (uri != null) {
+                val password = backupPassword.toCharArray()
+                Thread {
+                    try {
+                        val encrypted = contentResolver.openInputStream(uri)?.use { input ->
+                            val output = java.io.ByteArrayOutputStream()
+                            val buffer = ByteArray(8192)
+                            var total = 0
+                            while (true) {
+                                val count = input.read(buffer)
+                                if (count < 0) break
+                                total += count
+                                require(total <= 50 * 1024 * 1024 + 64) { "Backup file is too large." }
+                                output.write(buffer, 0, count)
+                            }
+                            output.toByteArray()
+                        } ?: error("Could not read the selected backup.")
+                        val payload = BackupCrypto.decrypt(encrypted, password)
+                        secureStore.restorePortableBackup(payload)
+                        runOnUiThread {
+                            keyHex = secureStore.loadConversationKey()
+                            localEcho.clear()
+                            localEcho.addAll(secureStore.loadMessages())
+                            status = "Backup restored and re-encrypted with this device's Android Keystore."
+                        }
+                    } catch (e: Exception) {
+                        runOnUiThread { status = e.localizedMessage ?: "Restore failed." }
+                    } finally { password.fill(' ') }
+                }.start()
+            }
         }
         var connectedEndpoint by remember { mutableStateOf<String?>(null) }
         var pendingPeer by remember { mutableStateOf<Triple<String, String, String>?>(null) }
@@ -201,6 +257,33 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                     }
+                    HorizontalDivider()
+                    Text("Encrypted cloud backup", style = MaterialTheme.typography.titleSmall)
+                    OutlinedTextField(
+                        value = backupPassword,
+                        onValueChange = { backupPassword = it },
+                        label = { Text("Backup password (12+ characters)") },
+                        supportingText = { Text("This password encrypts the backup locally. It is never uploaded. Save it somewhere safe.") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        shape = RoundedCornerShape(14.dp)
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = { backupExportLauncher.launch("uchat-backup.uchb") },
+                            enabled = backupPassword.length >= 12,
+                            modifier = Modifier.weight(1f)
+                        ) { Text("Back up") }
+                        OutlinedButton(
+                            onClick = { backupRestoreLauncher.launch(arrayOf("application/octet-stream", "*/*")) },
+                            enabled = backupPassword.length >= 12,
+                            modifier = Modifier.weight(1f)
+                        ) { Text("Restore") }
+                    }
+                    Text(
+                        "Choose Google Drive, OneDrive, Dropbox or another Android document provider when available. The file is encrypted before leaving this phone. Restoring replaces this phone's saved conversation key and local message history.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
                     HorizontalDivider()
                     Text("Shared conversation key", style = MaterialTheme.typography.titleSmall)
                     OutlinedTextField(
