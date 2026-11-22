@@ -97,7 +97,7 @@ async function route(req,res) {
     const id=url.searchParams.get("conversationId")||""; const after=url.searchParams.get("after")||"-"; const raw=await redis("GET","conversation:"+id);
     if(!raw) return json(res,404,{error:"Conversation not found"}); const conversation=JSON.parse(raw);
     if(!conversation.memberIds.includes(user.id)) return json(res,403,{error:"Not a conversation member"});
-    const entries=await redis("XRANGE","messages:"+id,"("+after,"+","COUNT",200)||[];
+    const entries=await redis("XRANGE","messages:"+id,(after === "-" ? "-" : "("+after),"+","COUNT",200)||[];
     const messages=entries.map(([streamId,fields])=>{const f={};for(let i=0;i<fields.length;i+=2)f[fields[i]]=fields[i+1];return {...f,streamId};});
     return json(res,200,{messages,nextCursor:messages.at(-1)?.streamId||after});
   }
