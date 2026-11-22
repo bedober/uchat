@@ -3,6 +3,7 @@ package so.zite.uchat.mesh
 import android.Manifest
 import android.os.Build
 import android.os.Bundle
+import java.security.SecureRandom
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -135,9 +136,14 @@ class MainActivity : ComponentActivity() {
                     OutlinedTextField(
                         value = keyHex, onValueChange = { keyHex = it.filter { ch -> ch in "0123456789abcdefABCDEF" }.take(64) },
                         label = { Text("Same 64-character hex key on both phones") },
-                        supportingText = { Text("Generate and exchange this key securely in person. Never send it in chat.") },
+                        supportingText = { Text("Generate once, then transfer the key securely in person. Never send it in chat.") },
                         modifier = Modifier.fillMaxWidth(), singleLine = true
                     )
+                    OutlinedButton(onClick = {
+                        val bytes = ByteArray(32).also { SecureRandom().nextBytes(it) }
+                        keyHex = bytes.joinToString("") { "%02x".format(it) }
+                        status = "New 256-bit key generated on this phone. Enter this exact key on the other phone using a secure out-of-band method."
+                    }) { Text("Generate new 256-bit key") }
                     OutlinedTextField(
                         value = message, onValueChange = { message = it },
                         label = { Text("Message") }, modifier = Modifier.fillMaxWidth()
