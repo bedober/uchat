@@ -1,194 +1,173 @@
 package so.zite.uchat.mesh
 
+import android.annotation.SuppressLint
+import android.app.Activity
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
+import android.view.View
+import android.webkit.CookieManager
+import android.webkit.DownloadListener
+import android.webkit.WebChromeClient
+import android.webkit.WebResourceError
+import android.webkit.WebResourceRequest
+import android.webkit.WebSettings
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import android.widget.FrameLayout
+import android.widget.ProgressBar
+import android.widget.Toast
 import androidx.activity.ComponentActivity
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.graphics.Color
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
-import com.google.firebase.FirebaseApp
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.OAuthProvider
+import androidx.activity.OnBackPressedCallback
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.view.isVisible
 
+/**
+ * UChat Android client.
+ *
+ * The web app is the source of truth for accounts, chats and server-side features.
+ * This shell opens the real UChat web experience; it does not expose mesh/key setup.
+ */
 class MainActivity : ComponentActivity() {
-    private var firebaseAuth: FirebaseAuth? = null
+    private lateinit var webView: WebView
+    private lateinit var progress: ProgressBar
+    private var fileChooserCallback: android.webkit.ValueCallback<Array<Uri>>? = null
 
+    private val filePicker = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val callback = fileChooserCallback
+        fileChooserCallback = null
+        val data = if (result.resultCode == Activity.RESULT_OK) result.data else null
+        val uris = when {
+            data == null -> null
+            data.clipData != null -> Array(data.clipData!!.itemCount) { i -> data.clipData!!.getItemAt(i).uri }
+            data.data != null -> arrayOf(data.data!!)
+            else -> null
+        }
+        callback?.onReceiveValue(uris)
+    }
+
+    @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        firebaseAuth = try { if (FirebaseApp.initializeApp(this) != null) FirebaseAuth.getInstance() else null } catch (_: Exception) { null }
-        setContent { val auth = firebaseAuth; if (auth == null) AuthSetupScreen() else AuthGate(auth) }
-    }
+        window.statusBarColor = android.graphics.Color.rgb(255, 255, 255)
+        window.navigationBarColor = android.graphics.Color.rgb(255, 255, 255)
+        window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR or View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
 
-
-    @Composable
-    private fun AuthGate(auth: FirebaseAuth) {
-        var user by remember { mutableStateOf(auth.currentUser) }
-        DisposableEffect(auth) {
-            val listener = FirebaseAuth.AuthStateListener { user = it.currentUser }
-            auth.addAuthStateListener(listener)
-            onDispose { auth.removeAuthStateListener(listener) }
+        val root = FrameLayout(this)
+        webView = WebView(this)
+        progress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
+            isIndeterminate = false
+            max = 100
         }
-        if (user == null) {
-            AuthScreen(
-                onEmailAuth = { email, password, create, done ->
-                    val task = if (create) auth.createUserWithEmailAndPassword(email, password) else auth.signInWithEmailAndPassword(email, password)
-                    task.addOnCompleteListener { result -> done(if (result.isSuccessful) "Welcome to UChat." else result.exception?.localizedMessage ?: "Authentication failed.") }
-                },
-                onSocialAuth = { providerId, done ->
-                    val provider = OAuthProvider.newBuilder(providerId, this@MainActivity).build()
-                    auth.startActivityForSignInWithProvider(this@MainActivity, provider).addOnCompleteListener { result ->
-                        done(if (result.isSuccessful) "Signed in." else result.exception?.localizedMessage ?: "Sign-in failed.")
-                    }
+        root.addView(webView, FrameLayout.LayoutParams(-1, -1))
+        root.addView(progress, FrameLayout.LayoutParams(-1, dp(3)))
+        setContentView(root)
+
+        CookieManager.getInstance().setAcceptCookie(true)
+        CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true)
+        webView.settings.apply {
+            javaScriptEnabled = true
+            domStorageEnabled = true
+            databaseEnabled = true
+            loadsImagesAutomatically = true
+            mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
+            javaScriptCanOpenWindowsAutomatically = true
+            setSupportMultipleWindows(false)
+            allowFileAccess = false
+            allowContentAccess = true
+            cacheMode = WebSettings.LOAD_DEFAULT
+            userAgentString = WebSettings.getDefaultUserAgent(this@MainActivity)
+        }
+        webView.isFocusable = true
+        webView.isFocusableInTouchMode = true
+
+        webView.webViewClient = object : WebViewClient() {
+            override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+                val uri = request.url
+                val host = uri.host.orEmpty()
+                if (uri.scheme == "https" && (host == "uchat.zite.so" || host.endsWith(".zite.so"))) return false
+                if (uri.scheme == "http" || uri.scheme == "https") {
+                    startActivity(Intent(Intent.ACTION_VIEW, uri))
+                    return true
                 }
-            )
-        } else {
-            Column(Modifier.fillMaxSize()) {
-                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("Signed in as " + (user?.email ?: user?.displayName ?: "UChat user"), modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
-                    TextButton(onClick = { auth.signOut() }) { Text("Sign out") }
-                }
-                Box(Modifier.weight(1f)) { AppHome() }
+                return true
             }
-        }
-    }
 
-    @Composable
-    private fun AuthSetupScreen() {
-        MaterialTheme(colorScheme = lightColorScheme(primary = Color(0xFFEC533C), background = Color(0xFFFCFAF8))) {
-            Surface(Modifier.fillMaxSize(), color = Color(0xFFFCFAF8)) {
-                Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("UChat", style = MaterialTheme.typography.headlineLarge, color = Color(0xFFEC533C))
-                    Text("Private conversations start here", style = MaterialTheme.typography.titleMedium)
-                    Spacer(Modifier.height(20.dp))
-                    Text("Authentication setup is required. Add google-services.json to native-android/app and enable Email/Password, Google and Facebook providers in Firebase Authentication.", style = MaterialTheme.typography.bodyMedium)
-                }
+            override fun onPageStarted(view: WebView, url: String, favicon: android.graphics.Bitmap?) {
+                progress.isVisible = true
+                progress.progress = 8
             }
-        }
-    }
 
-    @Composable
-    private fun AuthScreen(onEmailAuth: (String, String, Boolean, (String) -> Unit) -> Unit, onSocialAuth: (String, (String) -> Unit) -> Unit) {
-        var createAccount by remember { mutableStateOf(false) }
-        var email by remember { mutableStateOf("") }
-        var password by remember { mutableStateOf("") }
-        var showPassword by remember { mutableStateOf(false) }
-        var busy by remember { mutableStateOf(false) }
-        var message by remember { mutableStateOf("") }
-        val colors = lightColorScheme(primary = Color(0xFFEC533C), onPrimary = Color.White, background = Color(0xFFFCFAF8), surface = Color.White, onSurface = Color(0xFF16161D))
-        MaterialTheme(colorScheme = colors) {
-            Surface(Modifier.fillMaxSize(), color = colors.background) {
-                Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-                    Text("UChat", style = MaterialTheme.typography.headlineLarge, color = colors.primary)
-                    Spacer(Modifier.height(8.dp))
-                    Text(if (createAccount) "Create your account" else "Welcome back", style = MaterialTheme.typography.headlineSmall)
-                    Text("Your chats. Your privacy.", color = Color(0xFF77727A))
-                    Spacer(Modifier.height(24.dp))
-                    OutlinedButton(onClick = { busy = true; onSocialAuth("google.com") { message = it; busy = false } }, enabled = !busy, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)) { Text("Continue with Google") }
-                    OutlinedButton(onClick = { busy = true; onSocialAuth("facebook.com") { message = it; busy = false } }, enabled = !busy, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)) { Text("Continue with Facebook") }
-                    Row(Modifier.fillMaxWidth().padding(vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) { HorizontalDivider(Modifier.weight(1f)); Text("  or use email  ", color = Color.Gray); HorizontalDivider(Modifier.weight(1f)) }
-                    OutlinedTextField(value = email, onValueChange = { email = it.trim() }, label = { Text("Email address") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp))
-                    Spacer(Modifier.height(12.dp))
-                    OutlinedTextField(value = password, onValueChange = { password = it }, label = { Text("Password") }, singleLine = true, visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(), trailingIcon = { IconButton(onClick = { showPassword = !showPassword }) { Icon(if (showPassword) Icons.Default.VisibilityOff else Icons.Default.Visibility, "Toggle password visibility") } }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp))
-                    Spacer(Modifier.height(16.dp))
-                    Button(onClick = { if (!email.contains("@") || password.length < 6) message = "Enter a valid email and a password of at least 6 characters." else { busy = true; onEmailAuth(email, password, createAccount) { message = it; busy = false } } }, enabled = !busy, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)) { Text(if (busy) "Please wait…" else if (createAccount) "Create account" else "Sign in") }
-                    TextButton(onClick = { createAccount = !createAccount; message = "" }, enabled = !busy) { Text(if (createAccount) "Already have an account? Sign in" else "New to UChat? Create an account") }
-                    if (message.isNotBlank()) Text(message, color = if (message.startsWith("Welcome") || message.startsWith("Signed in")) Color(0xFF287A49) else Color(0xFFB33A2B), style = MaterialTheme.typography.bodySmall)
-                    Spacer(Modifier.height(20.dp))
-                    Text("Account sign-in is separate from your end-to-end message encryption.", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+            override fun onPageFinished(view: WebView, url: String) {
+                progress.progress = 100
+                progress.postDelayed({ progress.isVisible = false }, 250)
+            }
+
+            override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
+                if (request.isForMainFrame) {
+                    Toast.makeText(this@MainActivity, "Unable to load UChat. Check your internet connection and retry.", Toast.LENGTH_LONG).show()
                 }
             }
         }
-    }
+        webView.webChromeClient = object : WebChromeClient() {
+            override fun onProgressChanged(view: WebView, newProgress: Int) {
+                progress.progress = newProgress
+                progress.isVisible = newProgress < 100
+            }
 
-    @OptIn(ExperimentalMaterial3Api::class)
-    @Composable
-    private fun AppHome() {
-        var selectedTab by remember { mutableStateOf("Chats") }
-        val tabs = listOf("Chats", "Calls", "Feeds", "Wallet")
-        val colors = lightColorScheme(
-            primary = Color(0xFFEC533C),
-            onPrimary = Color.White,
-            background = Color(0xFFFCFAF8),
-            surface = Color.White,
-            onSurface = Color(0xFF16161D),
-            surfaceVariant = Color(0xFFF3EFEC)
-        )
-        MaterialTheme(colorScheme = colors) {
-            Scaffold(
-                containerColor = colors.background,
-                topBar = {
-                    TopAppBar(
-                        title = { Text("UChat", style = MaterialTheme.typography.headlineSmall) },
-                        actions = {
-                            TextButton(onClick = { selectedTab = "Profile" }) { Text("Profile") }
-                        },
-                        colors = TopAppBarDefaults.topAppBarColors(containerColor = colors.background)
-                    )
-                },
-                bottomBar = {
-                    NavigationBar(containerColor = Color.White) {
-                        tabs.forEach { tab ->
-                            NavigationBarItem(
-                                selected = selectedTab == tab,
-                                onClick = { selectedTab = tab },
-                                icon = { Text(when (tab) { "Chats" -> "💬"; "Calls" -> "☎"; "Feeds" -> "▤"; else -> "◈" }) },
-                                label = { Text(tab) }
-                            )
-                        }
-                    }
-                }
-            ) { padding ->
-                Column(
-                    Modifier.fillMaxSize().padding(padding).padding(horizontal = 20.dp, vertical = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    when (selectedTab) {
-                        "Chats" -> {
-                            Text("Messages", style = MaterialTheme.typography.headlineMedium)
-                            OutlinedTextField(
-                                value = "",
-                                onValueChange = {},
-                                readOnly = true,
-                                enabled = false,
-                                label = { Text("Search conversations") },
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(16.dp)
-                            )
-                            Spacer(Modifier.height(28.dp))
-                            Text("No conversations yet", style = MaterialTheme.typography.titleMedium)
-                            Text("Your private conversations will appear here when you connect with people on UChat.", color = Color(0xFF77727A))
-                        }
-                        "Calls" -> {
-                            Text("Calls", style = MaterialTheme.typography.headlineMedium)
-                            Text("Your recent calls will appear here.", color = Color(0xFF77727A))
-                        }
-                        "Feeds" -> {
-                            Text("Feeds", style = MaterialTheme.typography.headlineMedium)
-                            Text("Updates from people and creators you follow will appear here.", color = Color(0xFF77727A))
-                        }
-                        "Wallet" -> {
-                            Text("Wallet", style = MaterialTheme.typography.headlineMedium)
-                            Text("Your on-device wallet and peer-to-peer payments will appear here when wallet support is added.", color = Color(0xFF77727A))
-                        }
-                        else -> {
-                            Text("Profile", style = MaterialTheme.typography.headlineMedium)
-                            Text("Manage your UChat account and preferences.")
-                        }
-                    }
+            override fun onShowFileChooser(
+                view: WebView,
+                callback: android.webkit.ValueCallback<Array<Uri>>,
+                params: FileChooserParams
+            ): Boolean {
+                fileChooserCallback?.onReceiveValue(null)
+                fileChooserCallback = callback
+                return try {
+                    filePicker.launch(params.createIntent())
+                    true
+                } catch (_: Exception) {
+                    fileChooserCallback = null
+                    callback.onReceiveValue(null)
+                    false
                 }
             }
         }
+        webView.setDownloadListener(DownloadListener { url, _, contentDisposition, mimeType, _ ->
+            try {
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    type = mimeType
+                }
+                startActivity(intent)
+            } catch (_: Exception) {
+                Toast.makeText(this, "No app available to open this download.", Toast.LENGTH_SHORT).show()
+            }
+        })
+
+        if (savedInstanceState == null) webView.loadUrl(HOME_URL) else webView.restoreState(savedInstanceState)
+
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (webView.canGoBack()) webView.goBack() else finish()
+            }
+        })
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        webView.saveState(outState)
+        super.onSaveInstanceState(outState)
+    }
+
+    override fun onDestroy() {
+        fileChooserCallback?.onReceiveValue(null)
+        webView.stopLoading()
+        webView.destroy()
+        super.onDestroy()
+    }
+
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
+
+    companion object {
+        private const val HOME_URL = "https://uchat.zite.so"
     }
 }
