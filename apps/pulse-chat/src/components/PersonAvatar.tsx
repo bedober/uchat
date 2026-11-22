@@ -16,7 +16,7 @@ export default function PersonAvatar({ name, image, online, group, className }: 
     <div className="relative shrink-0">
       <Avatar className={cn('h-11 w-11', className)}>
         {image && <AvatarImage src={image} alt={name} className="object-cover" />}
-        <AvatarFallback className={cn('font-semibold', group ? 'bg-secondary text-secondary-foreground' : 'bg-accent text-accent-foreground')}>
+        <AvatarFallback className={cn('font-semibold text-base', group ? 'bg-secondary text-secondary-foreground' : 'bg-[#FDEBE8] text-[#A63F31]')}>
           {group ? <Users className="h-5 w-5" /> : initials || '?'}
         </AvatarFallback>
       </Avatar>
