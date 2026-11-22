@@ -78,3 +78,13 @@ References:
 AES-256-GCM with authenticated metadata and Argon2id (64 MiB, 3 iterations, 1 lane) provides strong password-based key derivation for this mobile backup format. These parameters are a starting point and should be benchmarked on low-memory Android devices and reviewed before production release. Password entropy matters more than raw AES key size. Never reuse a backup password across unrelated services.
 
 The backup protects data in the cloud and in transit to/from the selected provider, but does not protect data while the phone is unlocked or compromised. Android Keystore device-local encryption keys are intentionally not exported; portable backups decrypt and re-encrypt data across devices using the user-held backup password.
+
+## Android account sign-in
+
+- The native app now presents a UChat login/sign-up screen before opening the nearby-messaging workspace.
+- Email/password registration and login use Firebase Authentication.
+- Google and Facebook buttons use Firebase OAuth provider IDs (`google.com` and `facebook.com`).
+- To activate authentication, create a Firebase project, add an Android app with package name `so.zite.uchat.mesh`, place the downloaded `google-services.json` at `native-android/app/google-services.json`, and enable Email/Password, Google and Facebook under Firebase Authentication > Sign-in method.
+- For Facebook, also configure the Facebook app ID/secret and OAuth redirect URI shown by Firebase in the Facebook developer console. Add the Android app's SHA-1/SHA-256 signing fingerprints to Firebase for Google sign-in.
+- The Google Services Gradle plugin is applied only when `google-services.json` exists, so the source can still compile without the private project configuration. Without that file the app displays an authentication setup screen and cannot create or sign in to accounts.
+- Keep `google-services.json` and provider secrets out of public commits if your project policy treats them as private configuration. Do not mistake the sign-in identity provider for end-to-end encryption; chat encryption remains a separate layer.
