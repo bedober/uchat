@@ -17,7 +17,7 @@ import javax.crypto.spec.SecretKeySpec
  */
 object BackupCrypto {
     private val magic = byteArrayOf(0x55, 0x43, 0x48, 0x42) // UCHB
-    private const val VERSION: Byte = 1
+    private const val VERSION: Byte = 2
     private const val SALT_BYTES = 16
     private const val NONCE_BYTES = 12
     private const val TAG_BITS = 128
