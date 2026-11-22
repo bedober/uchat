@@ -46,3 +46,18 @@ References:
 - https://developers.google.com/nearby/connections/overview
 - https://developers.google.com/nearby/connections/android/manage-connections
 - https://developer.android.com/develop/connectivity/overview
+
+## Background offline test mode (early prototype)
+
+- The app now has an opt-in **Enable background mode** control. It starts an Android foreground service with an ongoing notification and keeps Nearby Connections advertising/discovery active while the app is backgrounded.
+- Nearby Connections can select supported Bluetooth/Wi-Fi transports and does not inherently require internet access. Test both phones on the same Wi-Fi router with its WAN/internet disconnected, and separately test one phone's hotspot with mobile data disabled.
+- The background service accepts the Nearby transport handshake and only stores a received message after AES-GCM authentication/decryption using the manually shared 256-bit conversation key. It does not put message plaintext in the notification.
+- To stop background mode, open UChat and tap **Stop background** or stop the app service from Android settings.
+
+### Test limitations — do not treat this as release-ready
+
+- Background service is a test scaffold, not a complete always-on messenger. Android battery controls, force-stop, permission changes and vendor policies can stop it.
+- The service currently handles background discovery and authenticated incoming message storage. Sending from the background service, reliable offline message queues/acknowledgements, reconnect/resume state, and seamless handoff between foreground and background transports are not complete.
+- Transport-level auto-accept is used by this prototype; it is not identity verification. Only peers possessing the same secret can produce valid AES-GCM messages, but this remains a manually provisioned shared-key design without forward secrecy or key rotation.
+- Verify on at least two physical Android devices. Emulator-only success is insufficient for Bluetooth/Wi-Fi radio behavior.
+- This build is for controlled testing only, not sensitive communications or production deployment.
