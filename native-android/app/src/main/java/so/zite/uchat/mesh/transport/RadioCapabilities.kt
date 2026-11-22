@@ -1,4 +1,4 @@
-package so.zite.uchat.mesh.transport
+package com.uchat.mesh.transport
 
 import android.content.Context
 import android.content.pm.PackageManager
