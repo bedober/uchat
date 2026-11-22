@@ -35,6 +35,11 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        requestNearbyPermissions()
+        setContent { MeshHome() }
+    }
+
+    private fun requestNearbyPermissions() {
         val needed = buildList {
             if (Build.VERSION.SDK_INT >= 31) {
                 add(Manifest.permission.BLUETOOTH_SCAN)
@@ -45,7 +50,6 @@ class MainActivity : ComponentActivity() {
             if (Build.VERSION.SDK_INT <= 32) add(Manifest.permission.ACCESS_FINE_LOCATION)
         }.toTypedArray()
         permissions.launch(needed)
-        setContent { MeshHome() }
     }
 
     @OptIn(ExperimentalMaterial3Api::class)
@@ -129,7 +133,8 @@ class MainActivity : ComponentActivity() {
                     }
                     Text(status, style = MaterialTheme.typography.bodySmall)
                     if (!nearbyPermissionsGranted) {
-                        Text("Nearby permissions are required. Grant Bluetooth and Wi-Fi nearby access when Android asks.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                        Text("Nearby permissions are required. Grant Bluetooth and Wi-Fi nearby access to discover phones.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                        OutlinedButton(onClick = { requestNearbyPermissions() }) { Text("Grant permissions") }
                     }
                     if (peers.isNotEmpty()) {
                         Text("NEARBY DEVICES", style = MaterialTheme.typography.labelLarge)
