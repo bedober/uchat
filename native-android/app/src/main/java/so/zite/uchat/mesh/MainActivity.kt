@@ -35,6 +35,7 @@ class MainActivity : ComponentActivity() {
             if (Build.VERSION.SDK_INT >= 31) {
                 add(Manifest.permission.BLUETOOTH_SCAN)
                 add(Manifest.permission.BLUETOOTH_CONNECT)
+                add(Manifest.permission.BLUETOOTH_ADVERTISE)
             }
             if (Build.VERSION.SDK_INT >= 33) add(Manifest.permission.NEARBY_WIFI_DEVICES)
             if (Build.VERSION.SDK_INT <= 32) add(Manifest.permission.ACCESS_FINE_LOCATION)
@@ -48,8 +49,6 @@ class MainActivity : ComponentActivity() {
     private fun MeshHome() {
         val caps = remember { RadioCapabilities.inspect(this) }
         val localCipher = remember { MessageCipher() }
-        val ble = remember { BleDiscovery(this) }
-        val wifi = remember { WifiDirectDiscovery(this) }
         var status by remember { mutableStateOf("Ready. Enable Bluetooth and Wi-Fi to connect nearby.") }
         var message by remember { mutableStateOf("") }
         var keyHex by remember { mutableStateOf("") }
@@ -88,7 +87,7 @@ class MainActivity : ComponentActivity() {
         }
 
         DisposableEffect(Unit) {
-            onDispose { transport.stop(); ble.stop() }
+            onDispose { transport.stop() }
         }
 
         MaterialTheme(colorScheme = darkColorScheme()) {
