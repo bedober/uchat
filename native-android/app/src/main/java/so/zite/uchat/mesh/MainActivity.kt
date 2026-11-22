@@ -28,7 +28,10 @@ import so.zite.uchat.mesh.transport.WifiDirectDiscovery
 import so.zite.uchat.mesh.transport.NearbyMeshTransport
 
 class MainActivity : ComponentActivity() {
-    private val permissions = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { }
+    private var nearbyPermissionsGranted by mutableStateOf(false)
+    private val permissions = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
+        nearbyPermissionsGranted = result.values.all { it }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -119,12 +122,15 @@ class MainActivity : ComponentActivity() {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(onClick = {
                             transport.advertise(Build.MODEL.ifBlank { "UChat device" })
-                        }, modifier = Modifier.weight(1f)) { Text("Become visible") }
-                        OutlinedButton(onClick = { transport.discover() }, modifier = Modifier.weight(1f)) {
+                        }, enabled = nearbyPermissionsGranted, modifier = Modifier.weight(1f)) { Text("Become visible") }
+                        OutlinedButton(onClick = { transport.discover() }, enabled = nearbyPermissionsGranted, modifier = Modifier.weight(1f)) {
                             Icon(Icons.Default.Radar, null); Spacer(Modifier.width(4.dp)); Text("Find peers")
                         }
                     }
                     Text(status, style = MaterialTheme.typography.bodySmall)
+                    if (!nearbyPermissionsGranted) {
+                        Text("Nearby permissions are required. Grant Bluetooth and Wi-Fi nearby access when Android asks.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                    }
                     if (peers.isNotEmpty()) {
                         Text("NEARBY DEVICES", style = MaterialTheme.typography.labelLarge)
                         peers.forEach { peer ->
