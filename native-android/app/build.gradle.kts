@@ -5,9 +5,9 @@ plugins {
 }
 if (file("google-services.json").exists()) pluginManager.apply("com.google.gms.google-services")
 android {
- namespace = "so.zite.uchat.mesh"
+ namespace = "com.uchat.mesh"
  compileSdk = 35
- defaultConfig { applicationId = "so.zite.uchat.mesh"; minSdk = 28; targetSdk = 35; versionCode = 3; versionName = "0.3.0" }
+ defaultConfig { applicationId = "com.uchat.mesh"; minSdk = 28; targetSdk = 35; versionCode = 3; versionName = "0.3.0" }
  buildFeatures { compose = true }
  compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
  kotlinOptions { jvmTarget = "17" }
