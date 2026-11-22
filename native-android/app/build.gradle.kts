@@ -3,6 +3,7 @@ plugins {
  id("org.jetbrains.kotlin.android")
  id("org.jetbrains.kotlin.plugin.compose")
 }
+if (file("google-services.json").exists()) pluginManager.apply("com.google.gms.google-services")
 android {
  namespace = "so.zite.uchat.mesh"
  compileSdk = 35
@@ -21,6 +22,8 @@ dependencies {
  implementation("androidx.core:core-ktx:1.15.0")
  implementation("com.google.android.gms:play-services-nearby:19.3.0")
  implementation("org.bouncycastle:bcprov-jdk18on:1.80")
+ implementation(platform("com.google.firebase:firebase-bom:33.12.0"))
+ implementation("com.google.firebase:firebase-auth")
  debugImplementation("androidx.compose.ui:ui-tooling")
  testImplementation("junit:junit:4.13.2")
 }
