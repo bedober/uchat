@@ -1,4 +1,4 @@
-package so.zite.uchat.mesh.security
+package com.uchat.mesh.security
 
 import java.security.KeyPair
 import java.security.KeyPairGenerator
