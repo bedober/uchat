@@ -1,4 +1,4 @@
-package so.zite.uchat.mesh.security
+package com.uchat.mesh.security
 
 import android.content.Context
 import android.util.Base64
