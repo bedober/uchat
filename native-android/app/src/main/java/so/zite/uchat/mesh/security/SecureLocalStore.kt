@@ -45,6 +45,34 @@ class SecureLocalStore(context: Context) {
         messagesFile.writeBytes(cipher.encrypt(json.toString().toByteArray(Charsets.UTF_8), "chat-history-v1".toByteArray()))
     }
 
+    /** Plaintext snapshot exists only in memory before being encrypted by BackupCrypto. */
+    @Synchronized
+    fun exportPortableBackup(): ByteArray {
+        val root = org.json.JSONObject()
+            .put("schema", 1)
+            .put("conversationKey", loadConversationKey())
+            .put("messages", JSONArray().also { array -> loadMessages().forEach(array::put) })
+        return root.toString().toByteArray(Charsets.UTF_8)
+    }
+
+    /** Validate the complete backup before changing the local encrypted store. */
+    @Synchronized
+    fun restorePortableBackup(payload: ByteArray) {
+        require(payload.size <= 50 * 1024 * 1024) { "Backup is too large." }
+        val root = org.json.JSONObject(payload.toString(Charsets.UTF_8))
+        require(root.optInt("schema", -1) == 1) { "Unsupported UChat backup schema." }
+        val restoredKey = root.optString("conversationKey", "")
+        require(restoredKey.isEmpty() || (restoredKey.length == 64 && restoredKey.all { it in "0123456789abcdefABCDEF" })) {
+            "Backup contains an invalid conversation key."
+        }
+        val array = root.optJSONArray("messages") ?: JSONArray()
+        require(array.length() <= 500) { "Backup contains too many messages." }
+        val restoredMessages = (0 until array.length()).map { array.getString(it) }
+        // Re-encrypt restored values using this device's non-exportable Android Keystore key.
+        saveConversationKey(restoredKey)
+        saveMessages(restoredMessages)
+    }
+
     @Synchronized
     fun loadMessages(): List<String> {
         if (!messagesFile.exists()) return emptyList()
