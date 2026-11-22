@@ -89,6 +89,11 @@ class NearbyMeshTransport(
             .addOnFailureListener { listener.onFailure("Advertising failed: ${it.localizedMessage}") }
     }
 
+    fun requestConnection(deviceName: String, endpointId: String) {
+        client.requestConnection(deviceName.take(32), endpointId, lifecycle)
+            .addOnFailureListener { listener.onFailure("Connection request failed: ${it.localizedMessage}") }
+    }
+
     fun discover() {
         client.startDiscovery(
             serviceId, discovery,
