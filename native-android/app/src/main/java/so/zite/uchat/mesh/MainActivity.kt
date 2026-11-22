@@ -3,6 +3,7 @@ package so.zite.uchat.mesh
 import android.Manifest
 import android.os.Build
 import android.os.Bundle
+import android.content.Intent
 import java.security.SecureRandom
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -161,6 +162,30 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                     Text(status, style = MaterialTheme.typography.bodySmall)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = {
+                                transport.stop()
+                                val intent = Intent(this@MainActivity, so.zite.uchat.mesh.transport.BackgroundMeshService::class.java)
+                                    .setAction(so.zite.uchat.mesh.transport.BackgroundMeshService.ACTION_START)
+                                if (Build.VERSION.SDK_INT >= 26) startForegroundService(intent) else startService(intent)
+                                status = "Background nearby mode started. Keep the ongoing UChat notification visible."
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) { Text("Enable background mode") }
+                        OutlinedButton(
+                            onClick = {
+                                stopService(Intent(this@MainActivity, so.zite.uchat.mesh.transport.BackgroundMeshService::class.java)
+                                    .setAction(so.zite.uchat.mesh.transport.BackgroundMeshService.ACTION_STOP))
+                                status = "Background nearby mode stopped"
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) { Text("Stop background") }
+                    }
+                    Text(
+                        "Background mode keeps nearby advertising and discovery active with a persistent notification. Incoming messages are decrypted and saved locally; this is an early test feature.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
                     if (!nearbyPermissionsGranted) {
                         Text("Nearby permissions are required. Grant Bluetooth and Wi-Fi nearby access to discover phones.", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                         OutlinedButton(onClick = { requestNearbyPermissions() }) { Text("Grant permissions") }
