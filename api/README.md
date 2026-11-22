@@ -9,11 +9,11 @@ Set these for Preview and Production before enabling the API:
 - `UPSTASH_REDIS_REST_URL` — Upstash Redis REST endpoint
 - `UPSTASH_REDIS_REST_TOKEN` — Upstash Redis REST token
 - `UCHAT_AUTH_SECRET` — random secret with at least 32 bytes of entropy
-- `RESEND_API_KEY` — Resend API key for email verification
-- `UCHAT_EMAIL_FROM` — verified sender address on your Resend domain
+- `GOOGLE_SMTP_USER` — the Gmail or Google Workspace address used to send verification codes
+- `GOOGLE_SMTP_APP_PASSWORD` — a Google App Password (not your normal Google account password)
 - `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER` — Twilio SMS sender configuration
 
-Never commit these values to Git. Email sign-in needs Resend; phone sign-in needs Twilio. Both channels use one-time verification codes.
+Never commit these values to Git. Email sign-in uses Gmail SMTP through Nodemailer; phone sign-in needs Twilio. Both channels use one-time verification codes.
 
 ## Routes
 
