@@ -1,4 +1,4 @@
-package so.zite.uchat.mesh.transport
+package com.uchat.mesh.transport
 import android.Manifest
 import android.bluetooth.BluetoothManager
 import android.bluetooth.le.ScanCallback
