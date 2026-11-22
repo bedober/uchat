@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Call
@@ -59,72 +60,75 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 private fun UChatApp() {
-    val initial = listOf(
-        ChatThread(1, "UChat Team", "Welcome to UChat 👋", "12:42", 2, Color(0xFF1B8A78), listOf(
-            ChatMessage("Welcome to UChat!", "12:40", false),
-            ChatMessage("Your chats will appear here.", "12:41", false),
-            ChatMessage("Great, let's get started.", "12:42", true)
-        )),
-        ChatThread(2, "Alex Morgan", "Are we still meeting today?", "11:18", 1, Color(0xFF547DA5), listOf(
-            ChatMessage("Hey! Are we still meeting today?", "11:17", false)
-        )),
-        ChatThread(3, "Family Group", "Mum: Have a good day ❤️", "Yesterday", 0, Color(0xFFB8794C), listOf(
-            ChatMessage("Good morning everyone", "08:10", false),
-            ChatMessage("Have a good day ❤️", "08:12", false)
-        )),
-        ChatThread(4, "Sam", "Photo", "Yesterday", 0, Color(0xFF8064A2), listOf(
-            ChatMessage("Sent you a photo", "19:20", false)
-        ))
-    )
-    var threads by remember { mutableStateOf(initial) }
     var selected by remember { mutableStateOf<Int?>(null) }
     var tab by remember { mutableStateOf("Chats") }
     var search by remember { mutableStateOf("") }
     BackHandler(selected != null) { selected = null }
-    val active = threads.firstOrNull { it.id == selected }
 
     MaterialTheme(colorScheme = lightColorScheme(primary = Green, secondary = Accent, background = Page)) {
-        if (active != null) {
-            ConversationScreen(active, onBack = { selected = null }, onSend = { value ->
-                val stamp = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
-                threads = threads.map { thread ->
-                    if (thread.id == active.id) thread.copy(preview = value, time = stamp, messages = thread.messages + ChatMessage(value, stamp, true)) else thread
+        Column(Modifier.fillMaxSize().background(Page)) {
+            Column(Modifier.fillMaxWidth().background(Green).padding(start = 18.dp, end = 12.dp, top = 18.dp, bottom = 10.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("UChat", color = Color.White, fontSize = 25.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                    IconButton(onClick = { search = if (search.isEmpty()) " " else "" }) { Icon(Icons.Default.Search, null, tint = Color.White) }
+                    IconButton(onClick = { tab = "Settings" }) { Icon(Icons.Default.MoreVert, null, tint = Color.White) }
                 }
-            })
-        } else {
-            Column(Modifier.fillMaxSize().background(Page)) {
-                Column(Modifier.fillMaxWidth().background(Green).padding(start = 18.dp, end = 12.dp, top = 18.dp, bottom = 10.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("UChat", color = Color.White, fontSize = 25.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                        IconButton(onClick = { search = if (search.isEmpty()) " " else "" }) { Icon(Icons.Default.Search, null, tint = Color.White) }
-                        IconButton(onClick = { tab = "Settings" }) { Icon(Icons.Default.MoreVert, null, tint = Color.White) }
-                    }
-                    if (search.isNotEmpty()) {
-                        Spacer(Modifier.height(8.dp))
-                        OutlinedTextField(value = search.trimStart(), onValueChange = { search = " " + it }, placeholder = { Text("Search chats") }, singleLine = true, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = Color.White, unfocusedBorderColor = Color.LightGray))
-                    }
-                    Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                        listOf("Chats", "Calls", "Groups", "Settings").forEach { item ->
-                            Text(item.uppercase(), color = if (tab == item) Color.White else Color(0xFFB9D7D2), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, modifier = Modifier.clickable { tab = item }.padding(horizontal = 8.dp, vertical = 8.dp))
-                        }
-                    }
+                if (search.isNotEmpty()) {
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(value = search.trimStart(), onValueChange = { search = " " + it }, placeholder = { Text("Search people and chats") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 }
+            }
+
+            Box(Modifier.weight(1f).fillMaxWidth()) {
                 when (tab) {
-                    "Chats" -> {
-                        LazyColumn(Modifier.weight(1f)) {
-                            item { SectionHint("MESSAGES") }
-                            items(threads.filter { search.trim().isEmpty() || it.name.contains(search.trim(), true) || it.preview.contains(search.trim(), true) }) { thread ->
-                                ChatRow(thread) { selected = thread.id }
-                            }
-                        }
-                        FloatingActionButton(onClick = { tab = "Groups" }, containerColor = Accent, contentColor = Color.White, modifier = Modifier.align(Alignment.End).padding(16.dp)) { Icon(Icons.Default.Chat, "New chat") }
-                    }
-                    "Calls" -> EmptyTab(Icons.Default.Call, "No calls yet", "Your recent calls will appear here.")
-                    "Groups" -> EmptyTab(Icons.Default.Groups, "Start a group", "Group conversations will appear here.")
-                    else -> EmptyTab(Icons.Default.Settings, "Settings", "Profile, privacy, notifications and account settings.")
+                    "Chats" -> EmptyTab(Icons.Default.Chat, "Your chats will appear here", "Sign in and start a conversation. No sample conversations are shown.")
+                    "Calls" -> EmptyTab(Icons.Default.Call, "No calls yet", "Your real call history will appear here when calling is connected.")
+                    "Wallet" -> WalletHome()
+                    "Communities" -> EmptyTab(Icons.Default.Groups, "Communities", "Your groups and communities will appear here.")
+                    else -> EmptyTab(Icons.Default.Settings, "Settings", "Account, privacy, security and notification settings.")
+                }
+            }
+
+            NavigationBar(containerColor = Color.White, tonalElevation = 6.dp) {
+                listOf(
+                    Triple("Chats", Icons.Default.Chat, "Chats"),
+                    Triple("Calls", Icons.Default.Call, "Calls"),
+                    Triple("Wallet", Icons.Default.AccountBalanceWallet, "Wallet"),
+                    Triple("Communities", Icons.Default.Groups, "Groups"),
+                    Triple("Settings", Icons.Default.Settings, "Settings")
+                ).forEach { (destination, icon, label) ->
+                    NavigationBarItem(
+                        selected = tab == destination,
+                        onClick = { tab = destination; selected = null },
+                        icon = { Icon(icon, contentDescription = label) },
+                        label = { Text(label, fontSize = 10.sp) },
+                        alwaysShowLabel = true,
+                        colors = NavigationBarItemDefaults.colors(selectedIconColor = Accent, selectedTextColor = Accent, indicatorColor = Color(0xFFE1F3EF))
+                    )
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun WalletHome() {
+    Column(
+        Modifier.fillMaxSize().background(Page).padding(22.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Box(Modifier.size(76.dp).clip(CircleShape).background(Color(0xFFE1F3EF)), contentAlignment = Alignment.Center) {
+            Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, tint = Accent, modifier = Modifier.size(38.dp))
+        }
+        Spacer(Modifier.height(18.dp))
+        Text("UChat Wallet", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color(0xFF111B21))
+        Spacer(Modifier.height(8.dp))
+        Text("Your personal wallet", color = Muted, fontSize = 14.sp)
+        Spacer(Modifier.height(18.dp))
+        Text("Wallet services are not connected yet.", color = Color(0xFF8A4B08), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(6.dp))
+        Text("No balance or transactions are fabricated. Wallet creation, secure recovery, transfers and marketplace payments must be implemented before funds can be used.", color = Muted, fontSize = 13.sp, lineHeight = 19.sp)
     }
 }
 
