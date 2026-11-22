@@ -23,12 +23,12 @@ async function sendSms(to, code) {
 function signToken(user) {
   const head=Buffer.from(JSON.stringify({alg:"HS256",typ:"JWT"})).toString("base64url");
   const payload=Buffer.from(JSON.stringify({sub:user.id,iat:Math.floor(Date.now()/1000),exp:Math.floor(Date.now()/1000)+60*60*24*30})).toString("base64url");
-  const unsigned=head+"."+payload; return unsigned+"."+hmac(unsigned);
+  const unsigned=head+"."+payload; return unsigned+"."+createHmac("sha256",env("UCHAT_AUTH_SECRET")).update(unsigned).digest("base64url");
 }
 async function authenticate(req) {
   const token=(req.headers.authorization||"").replace(/^Bearer\s+/i,""); const parts=token.split(".");
   if(parts.length!==3) throw new Error("Authentication required");
-  const expected=hmac(parts[0]+"."+parts[1]);
+  const expected=createHmac("sha256",env("UCHAT_AUTH_SECRET")).update(parts[0]+"."+parts[1]).digest("base64url");
   const a=Buffer.from(parts[2]), b=Buffer.from(expected);
   if(a.length!==b.length||!timingSafeEqual(a,b)) throw new Error("Invalid session");
   const claims=JSON.parse(Buffer.from(parts[1],"base64url").toString("utf8"));
@@ -43,7 +43,7 @@ async function route(req,res) {
   if(req.method==="POST"&&path==="auth/request-code") {
     const body=await readBody(req); const channel=String(body.channel||""); const identity=String(body.identity||"").trim();
     if(!validIdentity(channel,identity)) return json(res,400,{error:channel==="phone"?"Use international phone format, e.g. +256...":"Enter a valid email address"});
-    const digest=keyFor(channel+":"+identity); const code=String(randomInt(100000,1000000));
+    const digest=keyFor(channel+":"+identity); const attempts=Number(await redis("INCR","otp-send:"+digest)); if(attempts===1) await redis("EXPIRE","otp-send:"+digest,3600); if(attempts>5) return json(res,429,{error:"Too many verification requests. Try again later."}); const code=String(randomInt(100000,1000000));
     await redis("SET","otp:"+digest,JSON.stringify({hash:hmac(code),channel,identity,displayName:String(body.displayName||"").slice(0,80)}),"EX",600);
     if(channel==="email") await sendEmail(identity,code); else await sendSms(identity,code);
     return json(res,200,{ok:true,expiresIn:600});
@@ -51,11 +51,11 @@ async function route(req,res) {
   if(req.method==="POST"&&path==="auth/verify-code") {
     const body=await readBody(req); const channel=String(body.channel||""); const identity=String(body.identity||"").trim(); const code=String(body.code||"");
     if(!validIdentity(channel,identity)||!/^\d{6}$/.test(code)) return json(res,400,{error:"Invalid verification request"});
-    const digest=keyFor(channel+":"+identity); const stored=await redis("GET","otp:"+digest);
+    const digest=keyFor(channel+":"+identity); const attempts=Number(await redis("INCR","otp-verify:"+digest)); if(attempts===1) await redis("EXPIRE","otp-verify:"+digest,600); if(attempts>8) return json(res,429,{error:"Too many attempts. Request a new code later."}); const stored=await redis("GET","otp:"+digest);
     if(!stored) return json(res,401,{error:"Code expired or not requested"});
     const record=JSON.parse(stored), a=Buffer.from(record.hash), b=Buffer.from(hmac(code));
     if(a.length!==b.length||!timingSafeEqual(a,b)) return json(res,401,{error:"Incorrect verification code"});
-    await redis("DEL","otp:"+digest);
+    await redis("DEL","otp:"+digest); await redis("DEL","otp-verify:"+digest);
     let userId=await redis("GET","identity:"+digest);
     if(!userId) { userId=randomUUID(); await redis("SET","identity:"+digest,userId); }
     let user=await redis("GET","user:"+userId);
