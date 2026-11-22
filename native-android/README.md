@@ -10,17 +10,19 @@ Native Android companion module in the existing UChat/Pulse Chat repository.
 - Radio capability detection for Bluetooth LE, Wi-Fi Direct and Wi-Fi Aware.
 - BLE scanning and Wi-Fi Direct peer discovery entry points.
 - **Nearby Connections transport layer** for advertising, discovering, requesting and accepting nearby peer connections, disconnect handling, and byte-payload transfer. Google Play services selects supported Bluetooth/Wi-Fi technologies.
+- Compose UI now exposes advertise/discover/connect, a two-device authentication-code confirmation dialog, and encrypted byte-message send/receive.
+- Optional manually shared 256-bit conversation key: AES-256-GCM with a fresh random nonce per message. Both phones must enter the same 64-character hex key; exchange it out-of-band.
 - Incoming connections require explicit user approval after comparing the authentication digits on both devices.
 - Outgoing transport method accepts ciphertext only (the caller must encrypt before sending).
 - GitHub Actions debug APK build workflow.
 
 ## Important implementation status
 
-The transport layer is implemented as a reusable Kotlin class, but it is not yet connected to the Compose chat screen. The existing screen remains a radio-discovery and local-encryption demo. No claim is made that two phones can yet exchange chat messages through the visible UI.
+The Compose screen is wired to the Nearby transport and shared-key encryption path. Two compatible Android devices with Google Play services can be tested together. This has not yet been compiled or verified on physical devices in this environment; a successful GitHub Actions run and two-device test are still required.
 
 ## Security status — not production-ready
 
-The AES-256-GCM key in `MessageCipher` is generated in Android Keystore and is device-local; it cannot decrypt messages on another phone. Nearby Connections encrypts its transport, but transport encryption is not a substitute for an audited end-to-end messaging protocol.
+The AES-256-GCM key in `MessageCipher` is generated in Android Keystore and is device-local. For cross-device test messages, `SharedKeyCipher` uses a manually shared 32-byte key. This provides symmetric message confidentiality and integrity only while that key remains secret. Anyone who obtains the shared key can read messages; there is no forward secrecy, automatic key rotation, multi-device identity system or secure group protocol. Nearby Connections also encrypts its transport, but transport encryption is not a substitute for an audited end-to-end messaging protocol.
 
 The X25519/HKDF helper is only a primitive. It is not yet wired into a complete authenticated session protocol. Before production release, implement and independently review:
 - a vetted Signal Protocol implementation (X3DH/PQXDH as supported and Double Ratchet), rather than a home-grown ratchet;
