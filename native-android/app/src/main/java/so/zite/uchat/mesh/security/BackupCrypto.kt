@@ -12,7 +12,7 @@ import javax.crypto.spec.SecretKeySpec
  * Password-encrypted portable backup container.
  *
  * Format: magic("UCHB") || version(1) || salt(16) || nonce(12) || AES-256-GCM ciphertext.
- * PBKDF2-HMAC-SHA256 uses 600,000 iterations. The cloud receives only this opaque container.
+ * Argon2id v1.3 uses 64 MiB memory, 3 iterations, and one lane. The cloud receives only this opaque container.
  * The password is never stored in the container or sent to a cloud provider.
  */
 object BackupCrypto {
@@ -21,7 +21,8 @@ object BackupCrypto {
     private const val SALT_BYTES = 16
     private const val NONCE_BYTES = 12
     private const val TAG_BITS = 128
-    private const val ITERATIONS = 600_000
+    private const val ARGON2_ITERATIONS = 3
+    private const val ARGON2_MEMORY_KIB = 64 * 1024
     private const val KEY_BITS = 256
     private const val MIN_PASSWORD_CHARS = 12
     private const val MAX_BACKUP_BYTES = 50 * 1024 * 1024
@@ -70,12 +71,20 @@ object BackupCrypto {
     }
 
     private fun derive(password: CharArray, salt: ByteArray): SecretKeySpec {
-        val spec = PBEKeySpec(password, salt, ITERATIONS, KEY_BITS)
-        return try {
-            val bytes = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").generateSecret(spec).encoded
-            try { SecretKeySpec(bytes, "AES") } finally { bytes.fill(0) }
+        val parameters = Argon2Parameters.Builder(Argon2Parameters.ARGON2_id)
+            .withVersion(Argon2Parameters.ARGON2_VERSION_13)
+            .withIterations(ARGON2_ITERATIONS)
+            .withMemoryAsKB(ARGON2_MEMORY_KIB)
+            .withParallelism(1)
+            .withSalt(salt)
+            .build()
+        val bytes = ByteArray(KEY_BITS / 8)
+        try {
+            Argon2BytesGenerator().apply { init(parameters) }.generateBytes(password, bytes)
+            return SecretKeySpec(bytes, "AES")
         } finally {
-            spec.clearPassword()
+            bytes.fill(0)
+            parameters.clear()
         }
     }
 }
