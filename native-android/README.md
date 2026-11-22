@@ -1,27 +1,29 @@
 # UChat Android
 
-UChat is delivered on Android as a lightweight Android client for the existing UChat web app.
+Native Android client built with Kotlin and Jetpack Compose. The launcher opens the native UChat interface and does not redirect to the website.
 
-## User experience
+## Current navigation
 
-- Opening the app loads **https://uchat.zite.so** directly.
-- No mesh dashboard, manual encryption-key generation, shared-key entry, radio setup, or Firebase setup screen is shown.
-- Accounts, chat screens, and any features available on the UChat website are provided by the website itself.
-- The Android client enables JavaScript, DOM storage, cookies, file selection for web uploads, download hand-off, page progress, and Android back navigation.
-- The app uses HTTPS and blocks mixed-content loading.
+- Chats
+- Calls
+- Wallet (center tab)
+- Communities
+- Settings
 
-## Important product boundary
+The app no longer seeds the chat list with fabricated sample conversations. Until a signed-in account and live API connection are configured, empty states are shown rather than simulated users or messages.
 
-This Android package is a WebView client, not a new messaging backend. It does not independently implement WhatsApp-style messaging, push notifications, voice/video calls, contact sync, or end-to-end encryption. Those capabilities must exist and be configured in the UChat website/backend at https://uchat.zite.so. The app does not create or manage cryptographic identity keys itself.
+## Backend configuration
 
-For a complete WhatsApp-like product, the web platform still needs working user accounts, realtime message delivery, persistent conversation storage, media upload, notification delivery, and a reviewed end-to-end encryption protocol. Do not claim WhatsApp-equivalent security unless that protocol has been implemented and independently reviewed.
+The Vercel API is under `/api/v1`. See `api/README.md` for the required Upstash Redis, Google SMTP App Password, Twilio and authentication secrets. Configure these in Vercel Project Settings; never commit secrets to the repository.
+
+## Feature status
+
+The centered Wallet navigation and native screen are present, but wallet key generation, recovery, on-chain or peer-to-peer transfers, and marketplace settlement are not yet implemented. The wallet screen intentionally shows no invented balance.
+
+The native client still requires integration with the Vercel API for live OTP sign-in, conversation discovery, message send/receive, encrypted local persistence and synchronization. End-to-end encryption must use a reviewed protocol and verified identity keys before being described as production-secure. Voice/video calling requires a complete WebRTC client, call UI, permissions, signaling integration and TURN configuration.
+
+Do not distribute this build as a production messaging or wallet app until those integrations and two-device tests pass.
 
 ## Build
 
-Open this folder in Android Studio with JDK 17 and Android SDK 35, or run the repository's Android GitHub Actions workflow. Debug APK output: `app/build/outputs/apk/debug/app-debug.apk`.
-
-A successful workflow run is required before distributing an APK. Install and test on a physical Android phone, including login, chat navigation, media upload, file download, and Android back navigation.
-
-## Website
-
-- Production entry point: https://uchat.zite.so
+Open this folder in Android Studio with JDK 17 and Android SDK 35, or run the repository's GitHub Actions workflow. Debug APK output: `app/build/outputs/apk/debug/app-debug.apk`.
