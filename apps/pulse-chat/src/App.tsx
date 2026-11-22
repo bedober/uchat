@@ -17,6 +17,7 @@ import SettingsPage from './pages/SettingsPage';
 import MarketplacePage from './pages/MarketplacePage';
 import SavedPostsPage from './pages/SavedPostsPage';
 import CreatorStudioPage from './pages/CreatorStudioPage';
+import WalletPage from './pages/WalletPage';
 
 function Splash() {
   return (
@@ -59,6 +60,7 @@ function SignedIn({ userId }: { userId: string }) {
             <Route path="/feed" element={<FeedPage />} />
             <Route path="/calls" element={<CallsPage />} />
             <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/wallet" element={<WalletPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/marketplace" element={<MarketplacePage />} />
             <Route path="/saved" element={<SavedPostsPage />} />
