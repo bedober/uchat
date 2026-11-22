@@ -1,0 +1,52 @@
+name: ChatVault Flutter CI
+
+on:
+  push:
+    branches: [main, "feature/chatvault-flutter"]
+    paths:
+      - "chatvault/**"
+      - ".github/workflows/chatvault-flutter.yml"
+  pull_request:
+    paths:
+      - "chatvault/**"
+      - ".github/workflows/chatvault-flutter.yml"
+  workflow_dispatch:
+
+jobs:
+  flutter:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: chatvault/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter --version
+      # The repository stores a platform-neutral Flutter source tree. Generate
+      # the native Android/iOS runners before resolving plugins or building.
+      - run: flutter create --platforms=android,ios --project-name chatvault .
+      - run: flutter pub get
+      - run: flutter analyze --no-fatal-infos
+      - run: flutter test
+      - run: flutter build apk --debug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: chatvault-debug-apk
+          path: chatvault/mobile/build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
+
+  relay:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: chatvault/server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install --ignore-scripts
+      - run: npm run check
