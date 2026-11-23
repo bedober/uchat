@@ -125,9 +125,13 @@ async function route(req,res) {
   }
   if(path==="calls"&&req.method==="POST") {
     const body=await readBody(req); const to=String(body.to||""); const type=String(body.type||""); const callId=String(body.callId||randomUUID());
-    if(!to||!["offer","answer","ice","end","reject"].includes(type)||!await redis("GET","user:"+to)) return json(res,400,{error:"Invalid call signal"});
-    const conversationRaw=body.conversationId?await redis("GET","conversation:"+String(body.conversationId)):null;
-    if(conversationRaw&&!JSON.parse(conversationRaw).memberIds.includes(user.id)) return json(res,403,{error:"Not a conversation member"});
+    const conversationId=String(body.conversationId||"");
+    if(!to||to===user.id||!["offer","answer","ice","end","reject"].includes(type)||!conversationId) return json(res,400,{error:"A valid recipient, conversation and call signal are required"});
+    const conversationRaw=await redis("GET","conversation:"+conversationId);
+    if(!conversationRaw) return json(res,404,{error:"Conversation not found"});
+    const conversation=JSON.parse(conversationRaw);
+    if(!Array.isArray(conversation.memberIds)||!conversation.memberIds.includes(user.id)||!conversation.memberIds.includes(to)) return json(res,403,{error:"Caller and recipient must both belong to this conversation"});
+    if(!await redis("GET","user:"+to)) return json(res,404,{error:"Recipient account not found"});
     const payload=JSON.stringify({callId,from:user.id,type,payload:body.payload??null,sentAt:new Date().toISOString()});
     await redis("XADD","calls:"+to,"*","event",payload);
     return json(res,202,{ok:true,callId});
