@@ -1,6 +1,13 @@
-# UChat Android wrapper
+# UChat Android app
 
-A lightweight Android WebView app that opens https://uchat.zite.so.
+The Android app opens the live UChat service at https://uchat.zite.so.
+
+## Online and offline behavior
+- Online: loads UChat directly from the server, so account data and new messages remain server-backed.
+- Offline: displays a locally saved MHTML snapshot of the last successfully loaded page when one is available.
+- First-ever use without internet: displays a simple offline/retry screen.
+- When connectivity returns, the app automatically reloads the live server.
+- The saved page is a read-only snapshot. Sending messages, calls, login requests, and refreshing live data require internet. This is not a full offline message database or background sync system.
 
 ## Build
 1. Open this folder in Android Studio (Hedgehog or newer).
@@ -8,11 +15,4 @@ A lightweight Android WebView app that opens https://uchat.zite.so.
 3. Select Build > Build Bundle(s) / APK(s) > Build APK(s).
 4. Install the debug APK on an Android device.
 
-For a signed release, create a release keystore in Android Studio and configure signing before publishing.
-
-## Performance and limitations
-- Hardware-accelerated WebView, DOM storage, browser cache and retained cookies are enabled.
-- The app restores WebView state and shows a minimal loading surface.
-- First launch requires internet; this wrapper cannot remove latency from the network, Zite hosting, or backend.
-- Offline message sync, native push notifications, and background calling require native/backend integration and are not included yet.
-- File chooser support is included for chat attachments; external HTTPS links open outside the app.
+For a signed release, configure a release keystore before publishing.
